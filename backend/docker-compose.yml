@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paddykonect
+      POSTGRES_PASSWORD: paddykonect
+      POSTGRES_DB: paddykonect
+    ports:
+      # Host port 5433, not 5432 — avoids clashing with a native/Homebrew Postgres
+      # that may already be bound to 127.0.0.1:5432 / [::1]:5432 on the dev machine.
+      - "5433:5432"
+    volumes:
+      - paddykonect_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paddykonect"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+volumes:
+  paddykonect_postgres_data:

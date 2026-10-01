@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: paddykonect
+          POSTGRES_PASSWORD: paddykonect
+          POSTGRES_DB: paddykonect
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paddykonect"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://paddykonect:paddykonect@localhost:5432/paddykonect?schema=public
+      REDIS_URL: redis://localhost:6379
+      # CI-only throwaway secrets — never used outside this ephemeral runner.
+      JWT_ACCESS_SECRET: ci-test-access-secret-not-for-real-use
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-not-for-real-use
+      OTP_HASH_PEPPER: ci-test-otp-pepper-not-for-real-use
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run migrations
+        run: npx prisma migrate deploy
+
+      - name: Type-check & build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: E2E tests
+        run: npm run test:e2e
