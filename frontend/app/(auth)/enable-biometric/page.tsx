@@ -60,7 +60,7 @@ function EnableBiometricContent() {
 
   function proceed() {
     if (user) markPrompted(user.id);
-    router.push("/discover");
+    router.push("/home");
   }
 
   useEffect(() => {
@@ -123,7 +123,7 @@ function EnableBiometricContent() {
           <p className="font-body text-sm text-body-text">Choose how you want to quickly transact on your Paddykonect app</p>
         </div>
 
-        <div className="flex flex-col gap-[18px] rounded-field border border-border bg-white p-4">
+        <div className="flex flex-col gap-[18px] rounded-field border border-border bg-card p-4">
           <button type="button" className="flex items-center gap-2" onClick={() => setMethod("faceid")}>
             <Image src="/icons/face-id.svg" alt="" width={24} height={24} />
             <span className="font-body text-sm font-medium text-heading">Face ID</span>
@@ -147,7 +147,7 @@ function EnableBiometricContent() {
   return (
     <div className="flex flex-1 flex-col justify-between gap-4 px-5 pb-4 pt-6">
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <div className="flex size-[193px] items-center justify-center rounded-full bg-white">
+        <div className="flex size-[193px] items-center justify-center rounded-full bg-card">
           <Image src={copy.icon} alt="" width={115} height={115} />
         </div>
         <h1 className="font-heading text-xl font-bold leading-[28px] text-heading">{copy.heading}</h1>

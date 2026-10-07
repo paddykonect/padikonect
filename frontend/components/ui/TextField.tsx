@@ -15,7 +15,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   return (
     <div className="w-full">
       <div
-        className={`flex h-[46px] w-full items-center gap-3 overflow-hidden rounded-field border bg-white px-4 ${
+        className={`flex h-[46px] w-full items-center gap-3 overflow-hidden rounded-field border bg-card px-4 ${
           error ? "border-danger" : "border-border"
         }`}
       >

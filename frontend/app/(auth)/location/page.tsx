@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Button } from "@/components/ui/Button";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { RequireCountry } from "@/features/profile/require-country";
 
 // Matches Figma node 198:8589 ("location") and PRD Flow 1 step 7: "After the
 // Taste Picker, request location permission (for PadiRadar). Whether
@@ -16,7 +17,7 @@ function LocationContent() {
   const router = useRouter();
 
   function proceed() {
-    router.push("/discover");
+    router.push("/home");
   }
 
   function handleAllow() {
@@ -32,7 +33,7 @@ function LocationContent() {
       <ProgressBar percent={90} />
       <div className="flex flex-1 flex-col justify-between gap-4 px-5 pb-4 pt-4">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-          <div className="flex size-24 items-center justify-center rounded-full bg-heading">
+          <div className="flex size-24 items-center justify-center rounded-full bg-ink">
             <Image src="/icons/location-pin.svg" alt="" width={40} height={40} />
           </div>
           <h1 className="font-heading text-xl font-bold leading-[28px] text-heading">Find padis and hangouts near you</h1>
@@ -58,7 +59,9 @@ function LocationContent() {
 export default function LocationPage() {
   return (
     <RequireAuth>
-      <LocationContent />
+      <RequireCountry>
+        <LocationContent />
+      </RequireCountry>
     </RequireAuth>
   );
 }

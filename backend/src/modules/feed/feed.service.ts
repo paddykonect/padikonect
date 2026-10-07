@@ -1,3 +1,4 @@
+import { BlocksService } from '../blocks/blocks.service';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Post, PostMedia } from '@prisma/client';
 import {
@@ -70,15 +71,23 @@ export class FeedService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
+    private readonly blocks: BlocksService,
   ) {}
 
-  // Block-filtering (excluding posts by a blocked/blocking author) is
-  // retrofitted here in the Trust & Safety phase — not built yet, see plan §7.
-  async list(query: CursorPaginationQueryDto): Promise<CursorPage<PostView>> {
+  /** Posts by people blocked either way are left out for the viewer. */
+  async list(
+    query: CursorPaginationQueryDto,
+    viewerId?: string,
+  ): Promise<CursorPage<PostView>> {
     const cursorId = query.cursor ? decodeCursor(query.cursor) : undefined;
+    const hidden = viewerId ? await this.blocks.hiddenUserIds(viewerId) : [];
 
     const posts = await this.prisma.post.findMany({
-      where: { isDeleted: false, visibility: 'PUBLIC' },
+      where: {
+        isDeleted: false,
+        visibility: 'PUBLIC',
+        ...(hidden.length && { authorId: { notIn: hidden } }),
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
       ...(cursorId && { cursor: { id: cursorId }, skip: 1 }),

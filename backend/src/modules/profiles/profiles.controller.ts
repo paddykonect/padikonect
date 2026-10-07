@@ -39,7 +39,10 @@ export class ProfilesController {
   }
 
   @Get(':userId')
-  getPublic(@Param('userId') userId: string) {
-    return this.profiles.getPublic(userId);
+  getPublic(
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.profiles.getPublic(userId, user.id);
   }
 }

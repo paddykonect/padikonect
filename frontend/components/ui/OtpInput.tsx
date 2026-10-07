@@ -57,9 +57,14 @@ export function OtpInput({ length = 6, value, onChange, error, disabled }: OtpIn
           onPaste={handlePaste}
           disabled={disabled}
           inputMode="numeric"
+          // Tells browsers these are one-time-code boxes, not a login form —
+          // stops Chrome autofilling saved usernames/passwords into them, and
+          // lets iOS/Android offer the code from the SMS/email.
+          autoComplete={i === 0 ? "one-time-code" : "off"}
+          name={`otp-${i}`}
           maxLength={1}
           aria-label={`Digit ${i + 1}`}
-          className={`h-14 flex-1 rounded-field border bg-white text-center font-heading text-xl font-bold text-input-text outline-none focus:border-border-focus ${
+          className={`h-14 w-0 min-w-0 flex-1 rounded-field border bg-card text-center font-heading text-xl font-bold text-input-text outline-none focus:border-border-focus ${
             error ? "border-danger" : "border-border"
           }`}
         />

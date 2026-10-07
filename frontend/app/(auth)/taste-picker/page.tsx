@@ -10,6 +10,7 @@ import { TextField } from "@/components/ui/TextField";
 import { useAuth } from "@/features/auth/auth-context";
 import { RequireAuth } from "@/features/auth/require-auth";
 import * as profileApi from "@/features/profile/api";
+import { INTEREST_OPTIONS } from "@/features/profile/interests";
 import { DrinkPreference } from "@/features/profile/types";
 import { ApiError } from "@/lib/api/client";
 
@@ -22,7 +23,6 @@ const DRINK_OPTIONS: { value: DrinkPreference; label: string }[] = [
   { value: "NON_ALCOHOLIC", label: "Non-alcoholic" },
 ];
 
-const INTEREST_OPTIONS = ["Live music", "Rooftop vibes", "Foodie", "Game nights", "Wellness", "Book club", "Afrobeats", "Outdoors"];
 
 const MAX_INTERESTS = 10;
 
@@ -32,7 +32,7 @@ function Pill({ label, selected, onClick, fill = false }: { label: string; selec
       type="button"
       onClick={onClick}
       className={`${fill ? "flex-1" : "shrink-0"} rounded-pill border-2 px-4 py-2.5 font-body text-[13px] transition-colors ${
-        selected ? "border-heading bg-heading font-bold text-white" : "border border-border bg-white font-normal text-heading"
+        selected ? "border-heading bg-ink font-bold text-white" : "border border-border bg-card font-normal text-heading"
       }`}
     >
       {label}

@@ -51,14 +51,17 @@ describe('Webauthn (e2e)', () => {
     const email = `webauthn.test.${suffix}@example.com`;
     const phone = `+234${suffix}`;
 
-    const signupRes = await request(httpServer).post('/api/v1/auth/signup').send({
-      fullName: 'Webauthn Tester',
-      phone,
-      email,
-      password: 'Sup3rSecret!',
-      ageConfirmed: true,
-      termsAccepted: true,
-    });
+    const signupRes = await request(httpServer)
+      .post('/api/v1/auth/signup')
+      .send({
+        fullName: 'Webauthn Tester',
+        phone,
+        email,
+        password: 'Sup3rSecret!',
+        dateOfBirth: '1995-06-15',
+        ageConfirmed: true,
+        termsAccepted: true,
+      });
     const pendingToken = (signupRes.body as { data: { pendingToken: string } })
       .data.pendingToken;
     const code = await getLatestOtpCode(email);

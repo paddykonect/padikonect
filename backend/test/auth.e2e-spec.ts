@@ -65,6 +65,7 @@ describe('Auth (e2e)', () => {
       phone: identity.phone,
       email: identity.email,
       password: identity.password,
+      dateOfBirth: '1995-06-15',
       ageConfirmed: true,
       termsAccepted: true,
     });
@@ -98,6 +99,7 @@ describe('Auth (e2e)', () => {
         phone: identity.phone,
         email: identity.email,
         password: identity.password,
+        dateOfBirth: '1995-06-15',
         ageConfirmed: true,
         termsAccepted: true,
       });
@@ -133,11 +135,32 @@ describe('Auth (e2e)', () => {
       phone: identity.phone,
       email: identity.email,
       password: 'AnotherPass1!',
+      dateOfBirth: '1995-06-15',
       ageConfirmed: true,
       termsAccepted: true,
     });
     expect(dupeRes.status).toBe(409);
     expect((dupeRes.body as { code: string }).code).toBe('ACCOUNT_EXISTS');
+  });
+
+  it('rejects signup when the date of birth is under 18', async () => {
+    const identity = uniqueIdentity('underage');
+    const recent = new Date();
+    recent.setUTCFullYear(recent.getUTCFullYear() - 17);
+
+    const res = await request(httpServer)
+      .post('/api/v1/auth/signup')
+      .send({
+        fullName: identity.fullName,
+        phone: identity.phone,
+        email: identity.email,
+        password: identity.password,
+        dateOfBirth: recent.toISOString().slice(0, 10),
+        ageConfirmed: true,
+        termsAccepted: true,
+      });
+    expect(res.status).toBe(403);
+    expect((res.body as { code: string }).code).toBe('UNDERAGE');
   });
 
   it('login lockout: 5 failed attempts locks the account even against the correct password on the 6th try', async () => {

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { TextField } from "@/components/ui/TextField";
 import * as authApi from "@/features/auth/api";
+import { GoogleButton } from "@/features/auth/GoogleButton";
 import { useAuth } from "@/features/auth/auth-context";
 import * as webauthnApi from "@/features/webauthn/api";
 import { ApiError } from "@/lib/api/client";
@@ -42,7 +43,7 @@ export default function LoginPage() {
       const response = await startAuthentication({ optionsJSON: options });
       const session = await webauthnApi.verifyAuthentication(flowId, response);
       setSession(session);
-      router.push("/discover");
+      router.push("/home");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -55,6 +56,21 @@ export default function LoginPage() {
       }
     } finally {
       setBiometricSubmitting(false);
+    }
+  }
+
+  async function handleGoogle(idToken: string) {
+    setError(null);
+    try {
+      const result = await authApi.googleSignIn({ idToken, keepMeLoggedIn });
+      setSession(result);
+      router.push("/enable-biometric");
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "GOOGLE_SIGNUP_CONSENT_REQUIRED") {
+        setError("There's no Paddykonect account for this Google account yet. Sign up first.");
+      } else {
+        setError(err instanceof ApiError ? err.message : "Google login failed. Please try again.");
+      }
     }
   }
 
@@ -124,6 +140,7 @@ export default function LoginPage() {
         <Button type="submit" variant="primary" disabled={!valid} loading={submitting}>
           Log in
         </Button>
+        <GoogleButton text="signin_with" onCredential={(t) => void handleGoogle(t)} />
         {biometricAvailable && (
           <Button
             type="button"

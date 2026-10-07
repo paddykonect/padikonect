@@ -8,11 +8,13 @@ import { REDIS_CLIENT } from '../../database/redis.module';
 import { PrismaService } from '../../database/prisma.service';
 import { MailerService } from '../../integrations/mailer/mailer.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GoogleSignInDto } from './dto/google-sign-in.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { GoogleAuthService } from './google-auth.service';
 import { LockoutService } from './lockout.service';
 import { OtpService } from './otp.service';
 import { CreateSessionResult, SessionService } from './session.service';
@@ -28,7 +30,7 @@ export interface RequestMeta {
 export interface PublicUser {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   email: string;
   role: string;
   status: string;
@@ -52,6 +54,29 @@ function toPublicUser(user: User): PublicUser {
   };
 }
 
+// Parses a YYYY-MM-DD date of birth (as UTC midnight) and rejects anyone
+// under 18 or born in the future. The DTO already checked the format.
+export function parseAdultDateOfBirth(value: string, now = new Date()): Date {
+  const dob = new Date(`${value}T00:00:00Z`);
+  const eighteenth = new Date(dob);
+  eighteenth.setUTCFullYear(dob.getUTCFullYear() + 18);
+  if (Number.isNaN(dob.getTime()) || dob > now) {
+    throw new AppException(
+      'INVALID_DATE_OF_BIRTH',
+      'Enter a valid date of birth.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+  if (eighteenth > now) {
+    throw new AppException(
+      'UNDERAGE',
+      'You must be 18 or older to use Padikonect.',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+  return dob;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -61,10 +86,12 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly lockout: LockoutService,
     private readonly mailer: MailerService,
+    private readonly google: GoogleAuthService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   async signup(dto: SignupDto): Promise<{ pendingToken: string }> {
+    const dateOfBirth = parseAdultDateOfBirth(dto.dateOfBirth);
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ phone: dto.phone }, { email: dto.email }] },
     });
@@ -89,7 +116,7 @@ export class AuthService {
       const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
       await this.prisma.user.update({
         where: { id: existing.id },
-        data: { fullName: dto.fullName, passwordHash },
+        data: { fullName: dto.fullName, passwordHash, dateOfBirth },
       });
       userId = existing.id;
     } else {
@@ -100,6 +127,7 @@ export class AuthService {
           phone: dto.phone,
           email: dto.email,
           passwordHash,
+          dateOfBirth,
           status: AccountStatus.PENDING_VERIFICATION,
         },
       });
@@ -165,10 +193,11 @@ export class AuthService {
       );
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    // Google-only accounts have no password; same generic error as a wrong
+    // password so login can't be used to probe how an account signs in.
+    const passwordMatches =
+      user.passwordHash !== null &&
+      (await bcrypt.compare(dto.password, user.passwordHash));
     if (!passwordMatches) {
       await this.lockout.recordFailure(dto.identifier);
       throw new AppException(
@@ -211,14 +240,88 @@ export class AuthService {
     return this.issueTokens(updated, dto.keepMeLoggedIn ?? false, meta);
   }
 
+  // Sign in or sign up with a Google ID token. Matches an existing account by
+  // Google ID, else by (Google-verified) email — linking it and, since Google
+  // has verified the email, activating it if it was still pending OTP.
+  async googleSignIn(
+    dto: GoogleSignInDto,
+    meta: RequestMeta,
+  ): Promise<AuthTokens & { isNewUser: boolean }> {
+    const identity = await this.google.verify(dto.idToken);
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { googleId: identity.googleId },
+          { email: { equals: identity.email, mode: 'insensitive' } },
+        ],
+      },
+    });
+
+    if (existing) {
+      if (
+        existing.status !== AccountStatus.ACTIVE &&
+        existing.status !== AccountStatus.PENDING_VERIFICATION
+      ) {
+        throw new AppException(
+          'ACCOUNT_NOT_ACTIVE',
+          'Your account is not active. Please contact support.',
+          HttpStatus.FORBIDDEN,
+          { status: existing.status },
+        );
+      }
+      if (existing.googleId && existing.googleId !== identity.googleId) {
+        throw new AppException(
+          'ACCOUNT_EXISTS',
+          'This email is linked to a different Google account.',
+          HttpStatus.CONFLICT,
+        );
+      }
+      const user = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          googleId: identity.googleId,
+          status: AccountStatus.ACTIVE,
+          lastLoginAt: new Date(),
+        },
+      });
+      const tokens = await this.issueTokens(
+        user,
+        dto.keepMeLoggedIn ?? false,
+        meta,
+      );
+      return { ...tokens, isNewUser: false };
+    }
+
+    if (!dto.ageConfirmed || !dto.termsAccepted) {
+      throw new AppException(
+        'GOOGLE_SIGNUP_CONSENT_REQUIRED',
+        'Confirm you are 18+ and accept the Terms & Privacy Policy to sign up with Google.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        fullName: identity.name ?? identity.email.split('@')[0],
+        email: identity.email,
+        googleId: identity.googleId,
+        status: AccountStatus.ACTIVE,
+        lastLoginAt: new Date(),
+      },
+    });
+    const tokens = await this.issueTokens(
+      user,
+      dto.keepMeLoggedIn ?? false,
+      meta,
+    );
+    return { ...tokens, isNewUser: true };
+  }
+
   async refresh(
     presentedToken: string,
     meta: RequestMeta,
-  ): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    refreshTokenExpiresAt: Date;
-  }> {
+  ): Promise<AuthTokens> {
     const { userId, refreshToken } = await this.sessions.rotate(
       presentedToken,
       meta,
@@ -249,6 +352,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       refreshTokenExpiresAt: session.expiresAt,
+      user: toPublicUser(user),
     };
   }
 

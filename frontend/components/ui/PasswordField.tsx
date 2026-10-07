@@ -14,7 +14,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(fu
 
   return (
     <div className="w-full">
-      <div className={`flex h-[46px] w-full items-center gap-3 overflow-hidden rounded-field border bg-white px-4 ${error ? "border-danger" : "border-border"}`}>
+      <div className={`flex h-[46px] w-full items-center gap-3 overflow-hidden rounded-field border bg-card px-4 ${error ? "border-danger" : "border-border"}`}>
         <input
           ref={ref}
           type={visible ? "text" : "password"}

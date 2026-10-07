@@ -59,6 +59,7 @@ describe('Events + RSVP (e2e)', () => {
         phone,
         email,
         password: 'Sup3rSecret!',
+        dateOfBirth: '1995-06-15',
         ageConfirmed: true,
         termsAccepted: true,
       });

@@ -32,6 +32,7 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional().default(''),
   SMTP_SECURE: z.coerce.boolean().default(false),
   MAIL_FROM: z.string().default('Paddykonect <no-reply@paddykonect.com>'),
+  SUPPORT_EMAIL: z.string().optional().default(''),
 
   // --- Phase 2: Profile / Cloudinary ---
   // Optional at boot (unlike the JWT/OTP secrets, these can't be self-generated —
@@ -44,6 +45,10 @@ export const envSchema = z.object({
   // --- Phase 4: Padi Board / Events ---
   // Also optional — a real third-party account, same reasoning as Cloudinary above.
   GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
+
+  // --- Google sign-in — optional; /auth/google returns 503 until set. Must
+  // be the same OAuth Web client ID as the frontend's NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+  GOOGLE_CLIENT_ID: z.string().optional().default(''),
 
   // --- Biometric login (WebAuthn/passkeys) — Figma-only addition, not a
   // numbered phase. RP_ID/ORIGIN must match the frontend's real host in

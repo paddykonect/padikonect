@@ -12,6 +12,8 @@ interface AuthContextValue {
   user: PublicUser | null;
   accessToken: string | null;
   setSession: (session: AuthSession) => void;
+  /** Swap in a new access token for the same user (e.g. after changing password). */
+  replaceAccessToken: (token: string) => void;
   logout: () => Promise<void>;
 }
 
@@ -27,11 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     authApi
       .refreshSession()
-      .then(({ accessToken }) => {
-        setAccessToken(accessToken);
+      .then((session) => {
+        setAccessToken(session.accessToken);
+        setUser(session.user);
         setStatus("authenticated");
-        // The refresh endpoint doesn't return the user profile — the first
-        // authenticated page load re-fetches it from GET /profiles/me.
       })
       .catch(() => setStatus("unauthenticated"));
   }, []);
@@ -41,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user);
     setStatus("authenticated");
   }, []);
+
+  const replaceAccessToken = useCallback((token: string) => setAccessToken(token), []);
 
   const logout = useCallback(async () => {
     try {
@@ -54,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ status, user, accessToken, setSession, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ status, user, accessToken, setSession, replaceAccessToken, logout }}>{children}</AuthContext.Provider>
   );
 }
 

@@ -6,11 +6,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { EventHostGuard } from './guards/event-host.guard';
+import { HostingService } from './hosting.service';
 
 @Module({
   imports: [GeoModule, CloudinaryModule, GoogleMapsModule, NotificationsModule],
   controllers: [EventsController],
-  providers: [EventsService, EventHostGuard],
+  providers: [EventsService, HostingService, EventHostGuard],
   exports: [EventHostGuard],
 })
 export class EventsModule {}

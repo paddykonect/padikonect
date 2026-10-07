@@ -65,7 +65,23 @@ export default function ResetPasswordPage() {
         <p className="font-body text-sm text-body-text">Enter the 6-digit code we sent you, then choose a new password.</p>
 
         <OtpInput value={code} onChange={setCode} disabled={submitting} />
-        <PasswordField placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="new-password" className="font-body text-sm font-bold text-heading">
+            New password
+          </label>
+          <PasswordField
+            id="new-password"
+            name="new-password"
+            // "new-password" stops Chrome autofilling a saved password here
+            // and lets password managers suggest a strong one instead.
+            autoComplete="new-password"
+            placeholder="Choose a new password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+          />
+          <p className="font-body text-xs text-body-text">At least 8 characters.</p>
+        </div>
 
         {error && <p className="font-body text-sm text-danger">{error}</p>}
       </div>

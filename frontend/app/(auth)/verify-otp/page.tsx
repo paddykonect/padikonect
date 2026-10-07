@@ -77,7 +77,7 @@ export default function VerifyOtpPage() {
   return (
     <div className="flex flex-1 flex-col justify-between gap-4 px-5 pb-4 pt-1">
       <div className="flex flex-col gap-4">
-        <button type="button" onClick={() => router.back()} className="flex size-9 items-center justify-center rounded-full bg-white" aria-label="Back">
+        <button type="button" onClick={() => router.back()} className="flex size-9 items-center justify-center rounded-full bg-card" aria-label="Back">
           <Image src="/icons/chevron-left.svg" alt="" width={16} height={16} />
         </button>
 

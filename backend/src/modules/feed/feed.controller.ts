@@ -23,8 +23,11 @@ export class FeedController {
   constructor(private readonly feed: FeedService) {}
 
   @Get()
-  list(@Query() query: CursorPaginationQueryDto) {
-    return this.feed.list(query);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: CursorPaginationQueryDto,
+  ) {
+    return this.feed.list(query, user.id);
   }
 
   @Get('media-upload-signature')

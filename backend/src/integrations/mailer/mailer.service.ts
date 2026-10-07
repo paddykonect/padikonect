@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { Transporter } from 'nodemailer';
+import { OtpPurpose, renderOtpEmail } from './otp-email.template';
+
+// Keep in sync with OTP_TTL_MS in modules/auth/otp.service.ts.
+const OTP_EXPIRES_IN_MINUTES = 10;
 
 @Injectable()
 export class MailerService {
@@ -26,25 +30,33 @@ export class MailerService {
   }
 
   // Never called with OTP codes/tokens in the log line — callers pass rendered HTML only.
-  async send(to: string, subject: string, html: string): Promise<void> {
-    await this.transporter.sendMail({ from: this.from, to, subject, html });
+  async send(
+    to: string,
+    subject: string,
+    html: string,
+    text?: string,
+  ): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      html,
+      text,
+    });
     this.logger.log(`Sent "${subject}" email to ${to}`);
   }
 
-  async sendOtp(
-    to: string,
-    code: string,
-    purpose: 'signup' | 'password-reset',
-  ): Promise<void> {
-    const subject =
-      purpose === 'signup'
-        ? 'Verify your Paddykonect account'
-        : 'Reset your Paddykonect password';
-    const html = `
-      <p>Your Paddykonect verification code is:</p>
-      <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">${code}</p>
-      <p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
-    `;
-    await this.send(to, subject, html);
+  async sendOtp(to: string, code: string, purpose: OtpPurpose): Promise<void> {
+    const subject = {
+      signup: 'Verify your Paddykonect account',
+      'password-reset': 'Reset your Paddykonect password',
+      'contact-change': 'Confirm your new Paddykonect contact details',
+    }[purpose];
+    const { html, text } = renderOtpEmail(
+      code,
+      purpose,
+      OTP_EXPIRES_IN_MINUTES,
+    );
+    await this.send(to, subject, html, text);
   }
 }

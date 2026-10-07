@@ -6,6 +6,7 @@ import {
   appConfig,
   cloudinaryConfig,
   databaseConfig,
+  googleAuthConfig,
   googleMapsConfig,
   jwtConfig,
   mailConfig,
@@ -20,6 +21,7 @@ import { RedisModule } from './database/redis.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseTransformInterceptor } from './common/interceptors/response-transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { PresenceInterceptor } from './common/interceptors/presence.interceptor';
 import { ActiveAccountGuard } from './common/guards/active-account.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './modules/health/health.module';
@@ -30,6 +32,14 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { EventsModule } from './modules/events/events.module';
 import { RsvpModule } from './modules/rsvp/rsvp.module';
 import { WebauthnModule } from './modules/webauthn/webauthn.module';
+import { LocationsModule } from './modules/locations/locations.module';
+import { PadisModule } from './modules/padis/padis.module';
+import { BlocksModule } from './modules/blocks/blocks.module';
+import { SupportModule } from './modules/support/support.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { CommunitiesModule } from './modules/communities/communities.module';
+import { RadarModule } from './modules/radar/radar.module';
+import { VenuesModule } from './modules/venues/venues.module';
 
 @Module({
   imports: [
@@ -45,6 +55,7 @@ import { WebauthnModule } from './modules/webauthn/webauthn.module';
         mailConfig,
         cloudinaryConfig,
         googleMapsConfig,
+        googleAuthConfig,
         webauthnConfig,
       ],
       validate: validateEnv,
@@ -69,6 +80,14 @@ import { WebauthnModule } from './modules/webauthn/webauthn.module';
     EventsModule,
     RsvpModule,
     WebauthnModule,
+    LocationsModule,
+    VenuesModule,
+    PadisModule,
+    ChatModule,
+    CommunitiesModule,
+    RadarModule,
+    BlocksModule,
+    SupportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -76,6 +95,7 @@ import { WebauthnModule } from './modules/webauthn/webauthn.module';
     { provide: APP_GUARD, useClass: ActiveAccountGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: PresenceInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
   ],
 })

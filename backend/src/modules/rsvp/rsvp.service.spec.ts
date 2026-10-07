@@ -1,6 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access -- untyped jest.fn() mock.calls */
 import { PrismaService } from '../../database/prisma.service';
 import { RsvpService } from './rsvp.service';
+import { BlocksService } from '../blocks/blocks.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+function noBlocks() {
+  return {
+    hiddenUserIds: jest.fn().mockResolvedValue([]),
+    isBlockedEitherWay: jest.fn().mockResolvedValue(false),
+    assertNotBlocked: jest.fn(),
+  } as unknown as BlocksService;
+}
 
 function makeLockedEventRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -49,8 +59,16 @@ function makeTx(
 function makeService(tx: ReturnType<typeof makeTx>) {
   const prisma = {
     $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(tx)),
+    user: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ fullName: 'Padi', profile: null }),
+    },
   } as unknown as PrismaService;
-  return new RsvpService(prisma);
+  return new RsvpService(prisma, noBlocks(), {
+    notify: jest.fn(),
+    notifyMany: jest.fn(),
+  } as unknown as NotificationsService);
 }
 
 describe('RsvpService', () => {

@@ -24,7 +24,9 @@ export async function getLatestOtpCode(
       ),
     );
     if (match) {
-      const codeMatch = /(\d{6})/.exec(match.Content.Body);
+      // Anchor on the "Your code:" line — the multipart boundary is random
+      // hex and can itself contain a run of six digits.
+      const codeMatch = /code:\s*(\d{6})/i.exec(match.Content.Body);
       if (codeMatch) return codeMatch[1];
     }
     await new Promise((resolve) => setTimeout(resolve, 150));

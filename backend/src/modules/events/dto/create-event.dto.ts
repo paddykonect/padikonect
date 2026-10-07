@@ -10,10 +10,13 @@ import {
   IsPositive,
   IsString,
   IsUrl,
+  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ArrayMaxSize,
+  IsArray,
 } from 'class-validator';
 
 export class CreateEventDto {
@@ -84,6 +87,25 @@ export class CreateEventDto {
   @IsOptional()
   @IsEnum(EventDrinkCategory)
   drinkCategory?: EventDrinkCategory;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Interest tags, e.g. "Live music", "Afrobeats" (max 5)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(30, { each: true })
+  tags?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Host at a listed venue: location comes from the venue, and the hangout stays hidden until the venue confirms.',
+  })
+  @IsOptional()
+  @IsUUID()
+  venueId?: string;
 
   @ApiPropertyOptional({ enum: EventPrivacy, default: EventPrivacy.PUBLIC })
   @IsOptional()

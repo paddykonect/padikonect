@@ -11,7 +11,7 @@ export function Badge({ children, met = false }: BadgeProps) {
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-1 text-sm ${
-        met ? "bg-heading text-white" : "border-[0.5px] border-border bg-white text-heading"
+        met ? "bg-ink text-white" : "border-[0.5px] border-border bg-card text-heading"
       }`}
     >
       {children}

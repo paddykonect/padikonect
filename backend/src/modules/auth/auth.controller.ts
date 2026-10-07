@@ -17,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { AuthService, RequestMeta } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GoogleSignInDto } from './dto/google-sign-in.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
@@ -102,6 +103,25 @@ export class AuthController {
         this.config.get('app.nodeEnv') as string,
       );
     }
+    return result;
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async google(
+    @Body() dto: GoogleSignInDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.googleSignIn(dto, requestMeta(req));
+    setRefreshCookie(
+      res,
+      result.refreshToken,
+      result.refreshTokenExpiresAt,
+      this.config.get('app.nodeEnv') as string,
+    );
     return result;
   }
 

@@ -3,6 +3,15 @@
 import { PrismaService } from '../../database/prisma.service';
 import { CloudinaryService } from '../../integrations/cloudinary/cloudinary.service';
 import { FeedService } from './feed.service';
+import { BlocksService } from '../blocks/blocks.service';
+
+function noBlocks() {
+  return {
+    hiddenUserIds: jest.fn().mockResolvedValue([]),
+    isBlockedEitherWay: jest.fn().mockResolvedValue(false),
+    assertNotBlocked: jest.fn(),
+  } as unknown as BlocksService;
+}
 
 function makePost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -32,7 +41,11 @@ function makeService(posts: ReturnType<typeof makePost>[] = []) {
   const cloudinary = {
     getSignedUploadParams: jest.fn().mockReturnValue({ signature: 'sig' }),
   } as unknown as CloudinaryService;
-  return { service: new FeedService(prisma, cloudinary), prisma, cloudinary };
+  return {
+    service: new FeedService(prisma, cloudinary, noBlocks()),
+    prisma,
+    cloudinary,
+  };
 }
 
 describe('FeedService', () => {

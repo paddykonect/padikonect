@@ -20,6 +20,19 @@
   --color-primary-foreground: #1b3b2b;
   --color-danger: #dc2626;
 
+  /* Home (Figma node 590:8834) */
+  --color-accent: #d7e600;
+  --color-nav-active: #bbf246;
+  --color-toggle-bg: #f1ede2;
+  --color-card: #ffffff;
+  --color-live: #2fae60;
+  /* Brand dark green for surfaces (nav, dark buttons, selected pills). Unlike
+     --color-heading (a text colour), it stays dark in night mode. */
+  --color-ink: #1b3b2b;
+  /* Settings (Figma page 284:6845) */
+  --color-divider: #f1ede2;
+  --color-error: #b3261e;
+
   --font-heading: var(--font-baloo-2), sans-serif;
   --font-body: var(--font-work-sans), sans-serif;
 
@@ -31,4 +44,67 @@ body {
   background-color: var(--color-background);
   color: var(--color-heading);
   font-family: var(--font-body);
+}
+
+/*
+ * Night mode. No dark frames exist in Figma, so this palette is derived from
+ * the brand greens: deep green surfaces, cream text, lime accents unchanged.
+ * Toggled by features/theme (html[data-theme="dark"], saved per browser).
+ * --color-ink stays dark green so dark surfaces (nav, selected pills, dark
+ * buttons) keep their look; text uses --color-heading, which flips to cream.
+ */
+html[data-theme="dark"] {
+  --color-background: #0f1d16;
+  --color-heading: #eef2e6;
+  --color-body-text: #a9b3a7;
+  --color-body-text-subtle: #8d988c;
+  --color-input-text: #eef2e6;
+  --color-border: #2f4a3b;
+  --color-border-subtle: #243b2f;
+  --color-border-focus: #d7e600;
+  --color-card: #172a20;
+  --color-toggle-bg: #13241b;
+  --color-ink: #24493a;
+  --color-divider: #243b2f;
+}
+
+/* Dark-stroked icons sitting on cards/background: invert them at night. */
+html[data-theme="dark"] .dark-invert,
+html[data-theme="dark"] img[src$="/icons/chevron-left.svg"],
+html[data-theme="dark"] img[src$="/icons/close.svg"],
+html[data-theme="dark"] img[src$="/icons/search.svg"],
+html[data-theme="dark"] img[src$="/icons/edit.svg"],
+html[data-theme="dark"] img[src$="/icons/home/bell.svg"],
+html[data-theme="dark"] img[src$="/icons/home/scan.svg"],
+html[data-theme="dark"] img[src$="/icons/home/night-mode.svg"],
+html[data-theme="dark"] img[src$="/icons/home/chevron-down.svg"],
+html[data-theme="dark"] img[src$="/icons/home/filter.svg"],
+html[data-theme="dark"] img[src$="/icons/home/expand.svg"],
+html[data-theme="dark"] img[src$="/icons/profile/settings.svg"],
+html[data-theme="dark"] img[src$="/icons/profile/chevron-right.svg"],
+html[data-theme="dark"] img[src$="/icons/profile/info.svg"],
+html[data-theme="dark"] img[src$="/icons/profile/mail.svg"],
+html[data-theme="dark"] img[src$="/icons/chat/back.svg"],
+html[data-theme="dark"] img[src$="/icons/chat/info.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/calendar.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/calendar18.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/chevron.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/close.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/collapse.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/copy.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/search.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/search-field.svg"],
+html[data-theme="dark"] img[src$="/icons/hangout/share.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/chevron-down.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/mail.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/whatsapp.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/add.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/trophy.svg"],
+html[data-theme="dark"] img[src$="/icons/settings/user.svg"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Dark map tiles (pins and overlays are unaffected). */
+html[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/auth-context";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { RequireCountry } from "@/features/profile/require-country";
 import * as notificationsApi from "@/features/notifications/api";
 import { AppNotification } from "@/features/notifications/types";
 
@@ -16,10 +17,39 @@ import { AppNotification } from "@/features/notifications/types";
 function iconFor(type: AppNotification["type"]): string {
   switch (type) {
     case "EVENT_CANCELLED":
+    case "VENUE_CONFIRMED":
+    case "VENUE_REJECTED":
+    case "VENUE_REQUEST":
       return "/icons/notif-location.svg";
+    case "RSVP_REQUESTED":
+      return "/icons/notif-request.svg";
+    case "RSVP_APPROVED":
+    case "RSVP_DECLINED":
+      return "/icons/notif-person.svg";
     case "EVENT_UPDATED":
+    case "EVENT_INVITE":
     default:
       return "/icons/notif-invite.svg";
+  }
+}
+
+/** Where tapping a notification goes, from its type and data. */
+function hrefFor(n: AppNotification): string | null {
+  const eventId = typeof n.data?.eventId === "string" ? n.data.eventId : null;
+  const userId = typeof n.data?.userId === "string" ? n.data.userId : null;
+  if (!eventId) return null;
+  switch (n.type) {
+    case "RSVP_REQUESTED":
+      return userId ? `/hangouts/${eventId}/requests/${userId}` : `/hangouts/${eventId}/requests`;
+    case "RSVP_APPROVED":
+      return `/hangouts/${eventId}/pass`;
+    case "VENUE_CONFIRMED":
+    case "VENUE_REJECTED":
+      return `/hangouts/${eventId}/venue`;
+    case "VENUE_REQUEST":
+      return "/admin/venue-requests";
+    default:
+      return `/hangouts/${eventId}`;
   }
 }
 
@@ -45,18 +75,18 @@ function isToday(iso: string): boolean {
 
 function NotificationRow({
   notification,
-  onRead,
+  onOpen,
 }: {
   notification: AppNotification;
-  onRead: (id: string) => void;
+  onOpen: (n: AppNotification) => void;
 }) {
   const unread = !notification.readAt;
   return (
     <button
       type="button"
-      onClick={() => unread && onRead(notification.id)}
+      onClick={() => onOpen(notification)}
       className={`flex w-full items-start gap-3 border-b border-border-subtle px-3.5 py-3.5 text-left last:border-b-0 ${
-        unread ? "bg-primary/10" : "bg-white"
+        unread ? "bg-primary/10" : "bg-card"
       }`}
     >
       <span
@@ -70,6 +100,7 @@ function NotificationRow({
         <span className={`block font-body text-sm ${unread ? "font-bold text-heading" : "font-normal text-heading"}`}>
           {notification.title}
         </span>
+        {notification.body && <span className="mt-0.5 block font-body text-[13px] text-body-text">{notification.body}</span>}
         <span className="mt-1 block font-body text-xs text-body-text">{relativeTime(notification.createdAt)}</span>
       </span>
       {unread && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
@@ -108,6 +139,12 @@ function NotificationsContent() {
     }
   }
 
+  function handleOpen(n: AppNotification) {
+    if (!n.readAt) void handleRead(n.id);
+    const href = hrefFor(n);
+    if (href) router.push(href);
+  }
+
   async function handleMarkAllRead() {
     if (!accessToken || !notifications) return;
     const unread = notifications.filter((n) => !n.readAt);
@@ -125,7 +162,7 @@ function NotificationsContent() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="flex size-9 items-center justify-center rounded-full bg-white"
+          className="flex size-9 items-center justify-center rounded-full bg-card"
           aria-label="Back"
         >
           <Image src="/icons/chevron-left.svg" alt="" width={16} height={16} />
@@ -148,7 +185,7 @@ function NotificationsContent() {
             <p className="font-body text-[13px] font-bold uppercase tracking-wide text-body-text">Today</p>
             <div className="overflow-hidden rounded-2xl">
               {today.map((n) => (
-                <NotificationRow key={n.id} notification={n} onRead={handleRead} />
+                <NotificationRow key={n.id} notification={n} onOpen={handleOpen} />
               ))}
             </div>
           </div>
@@ -159,7 +196,7 @@ function NotificationsContent() {
             <p className="font-body text-[13px] font-bold uppercase tracking-wide text-body-text">Earlier</p>
             <div className="overflow-hidden rounded-2xl">
               {earlier.map((n) => (
-                <NotificationRow key={n.id} notification={n} onRead={handleRead} />
+                <NotificationRow key={n.id} notification={n} onOpen={handleOpen} />
               ))}
             </div>
           </div>
@@ -172,7 +209,9 @@ function NotificationsContent() {
 export default function NotificationsPage() {
   return (
     <RequireAuth>
-      <NotificationsContent />
+      <RequireCountry>
+        <NotificationsContent />
+      </RequireCountry>
     </RequireAuth>
   );
 }

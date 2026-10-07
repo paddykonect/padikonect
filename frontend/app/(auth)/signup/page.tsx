@@ -6,25 +6,33 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { DateField } from "@/components/ui/DateField";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { TextField } from "@/components/ui/TextField";
 import { ApiError } from "@/lib/api/client";
 import * as authApi from "@/features/auth/api";
-import { isSignupValid, passwordRules } from "@/features/auth/validation";
+import { useAuth } from "@/features/auth/auth-context";
+import { GoogleButton } from "@/features/auth/GoogleButton";
+import { dobError, emailError, isSignupValid, latestAdultDob, passwordRules, phoneError } from "@/features/auth/validation";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { setSession } = useAuth();
   const [fullName, setFullName] = useState("");
   const [phoneLocal, setPhoneLocal] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dobTouched, setDobTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const valid = isSignupValid({ fullName, phoneLocal, email, password, ageConfirmed, termsAccepted });
+  const valid = isSignupValid({ fullName, phoneLocal, email, dateOfBirth, password, ageConfirmed, termsAccepted });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,18 +43,35 @@ export default function SignupPage() {
       const { pendingToken } = await authApi.signup({
         fullName,
         phone: `+234${phoneLocal}`,
-        email,
+        email: email.trim(),
+        dateOfBirth,
         password,
         ageConfirmed,
         termsAccepted,
       });
       sessionStorage.setItem("pk_pending_token", pendingToken);
-      sessionStorage.setItem("pk_pending_email", email);
+      sessionStorage.setItem("pk_pending_email", email.trim());
       router.push("/verify-otp");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // Google signup still needs the same 18+/Terms consent as email signup.
+  async function handleGoogle(idToken: string) {
+    if (!(ageConfirmed && termsAccepted)) {
+      setError("Tick the 18+ and Terms & Privacy Policy box first, then continue with Google.");
+      return;
+    }
+    setError(null);
+    try {
+      const result = await authApi.googleSignIn({ idToken, ageConfirmed, termsAccepted });
+      setSession(result);
+      router.push(result.isNewUser ? "/taste-picker" : "/home");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Google sign-up failed. Please try again.");
     }
   }
 
@@ -56,8 +81,34 @@ export default function SignupPage() {
         <h1 className="font-heading text-2xl font-bold leading-[32px] text-heading">Create your account</h1>
 
         <TextField placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-        <PhoneField placeholder="Enter phone number" value={phoneLocal} onChange={(e) => setPhoneLocal(e.target.value.replace(/\D/g, ""))} required />
-        <TextField type="email" placeholder="Enter your email address" value={email} onChange={(e) => setEmail(e.target.value)} icon={<MailIcon />} required />
+        <PhoneField
+          placeholder="Enter phone number"
+          value={phoneLocal}
+          onChange={(e) => setPhoneLocal(e.target.value.replace(/\D/g, ""))}
+          onBlur={() => setPhoneTouched(true)}
+          error={phoneTouched ? (phoneError(phoneLocal) ?? undefined) : undefined}
+          required
+        />
+        <TextField
+          type="email"
+          placeholder="Enter your email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setEmailTouched(true)}
+          error={emailTouched ? (emailError(email) ?? undefined) : undefined}
+          icon={<MailIcon />}
+          required
+        />
+        <DateField
+          placeholder="Date of birth"
+          value={dateOfBirth}
+          max={latestAdultDob()}
+          min="1900-01-01"
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          onBlur={() => setDobTouched(true)}
+          error={dobTouched ? (dobError(dateOfBirth) ?? undefined) : undefined}
+          required
+        />
         <PasswordField placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
         <div className="flex flex-col gap-2">
@@ -85,6 +136,7 @@ export default function SignupPage() {
         <Button type="submit" variant="primary" disabled={!valid} loading={submitting}>
           Continue
         </Button>
+        <GoogleButton text="signup_with" onCredential={(t) => void handleGoogle(t)} />
         <Link href="/login" className="w-full">
           <Button type="button" variant="text">
             {"Already have account? "}

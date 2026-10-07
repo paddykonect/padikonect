@@ -38,6 +38,8 @@ export const mailConfig = registerAs('mail', () => ({
   password: process.env.SMTP_PASSWORD || undefined,
   secure: process.env.SMTP_SECURE === 'true',
   from: process.env.MAIL_FROM ?? 'Paddykonect <no-reply@paddykonect.com>',
+  // Settings > Contact us messages are forwarded here (stored in the DB either way).
+  supportEmail: process.env.SUPPORT_EMAIL || undefined,
 }));
 
 export const cloudinaryConfig = registerAs('cloudinary', () => ({
@@ -48,6 +50,10 @@ export const cloudinaryConfig = registerAs('cloudinary', () => ({
 
 export const googleMapsConfig = registerAs('googleMaps', () => ({
   apiKey: process.env.GOOGLE_MAPS_API_KEY || undefined,
+}));
+
+export const googleAuthConfig = registerAs('googleAuth', () => ({
+  clientId: process.env.GOOGLE_CLIENT_ID || undefined,
 }));
 
 export const webauthnConfig = registerAs('webauthn', () => ({

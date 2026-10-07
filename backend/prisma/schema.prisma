@@ -30,30 +30,60 @@ enum AccountStatus {
 enum OtpPurpose {
   SIGNUP_VERIFICATION
   PASSWORD_RESET
+  // Settings > Phone & email: confirms new contact details before saving.
+  CONTACT_CHANGE
 }
 
 model User {
   id           String        @id @default(uuid())
   fullName     String
-  phone        String        @unique
+  // Nullable for Google sign-in accounts: Google shares no phone number and
+  // those users have no password until they set one via forgot-password.
+  phone        String?       @unique
   email        String        @unique
-  passwordHash String
+  passwordHash String?
+  googleId     String?       @unique
+  // Collected on email signup (server enforces 18+). Nullable because Google
+  // sign-in and accounts created before this field existed don't have one.
+  dateOfBirth  DateTime?     @db.Date
   role         UserRole      @default(MEMBER)
   status       AccountStatus @default(PENDING_VERIFICATION)
   lastLoginAt  DateTime?
+  // Presence: bumped (throttled) on authenticated requests; "online" is
+  // derived as lastSeenAt within PRESENCE_WINDOW_MS (see presence.ts).
+  lastSeenAt   DateTime?
   deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  sessions         Session[]
-  otpVerifications OtpVerification[]
-  profile          Profile?
-  posts            Post[]
-  eventsHosted     Event[]                    @relation("EventHost")
-  rsvps            Rsvp[]
+  sessions                Session[]
+  otpVerifications        OtpVerification[]
+  profile                 Profile?
+  posts                   Post[]
+  eventsHosted            Event[]                   @relation("EventHost")
+  rsvps                   Rsvp[]
   conversationMemberships ConversationParticipant[]
-  notifications    Notification[]
+  notifications           Notification[]
   webauthnCredentials     WebauthnCredential[]
+  venueFavorites          VenueFavorite[]
+  padiConnections         PadiConnection[]          @relation("PadiOwner")
+  padiOf                  PadiConnection[]          @relation("PadiTarget")
+  statuses                PadiStatus[]
+  messages                Message[]
+  communitiesCreated      Community[]
+  communityMemberships    CommunityMember[]
+  liveLocation            LiveLocation?
+  statusViews             StatusView[]
+  blocksMade              Block[]                   @relation("Blocker")
+  blockedBy               Block[]                   @relation("Blocked")
+  supportMessages         SupportMessage[]
+  venueReviews            VenueReview[]
+  eventInvites            EventInvite[]
+  radarHidesMade          RadarHide[]               @relation("RadarHider")
+  radarHiddenFrom         RadarHide[]               @relation("RadarHiddenFrom")
+  padiRatingsGiven        PadiRating[]              @relation("PadiRater")
+  padiRatingsReceived     PadiRating[]              @relation("PadiRatee")
+  eventFavorites          EventFavorite[]
 
   @@index([status])
 }
@@ -102,28 +132,43 @@ enum DrinkPreference {
 }
 
 model Profile {
-  id              String          @id @default(uuid())
-  userId          String          @unique
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName     String?
-  photoUrl        String?
-  photoPublicId   String?
-  bio             String?         @db.VarChar(280)
-  drinkPreference DrinkPreference @default(BOTH)
-  interests       String[]
+  id                String          @id @default(uuid())
+  userId            String          @unique
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName       String?
+  photoUrl          String?
+  photoPublicId     String?
+  bio               String?         @db.VarChar(280)
+  drinkPreference   DrinkPreference @default(BOTH)
+  interests         String[]
+  // Profile card ("Wants to be invited for") — a short free-text hint shown on
+  // your profile about the kinds of hangouts you'd like invites to.
+  wantsToBeInvitedFor String?       @db.VarChar(80)
   // Onboarding location sub-flow (Figma-only, not in the PRD — added at the
   // user's explicit request). country/state use Nigeria's states where
   // applicable; nationality is only set when the user confirms it matches
   // their country of residence.
-  country         String?
-  nationality     String?
-  state           String?
+  country           String?
+  nationality       String?
+  state             String?
   // MVP placeholder — read-only display value. A future Padi Points
   // ledger table (Padi Deals, product-roadmap Phase 2, out of scope here)
   // will likely replace this with a derived balance.
-  padiPoints      Int             @default(0)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  padiPoints        Int             @default(0)
+  // Settings > Preferences / Privacy & safety.
+  invitePolicy      InvitePolicy    @default(EVERYONE)
+  pushNotifications Boolean         @default(true)
+  locationServices  Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// Who may send you hangout invites (Settings > Who can invite me). Doesn't
+// affect requests to join public hangouts.
+enum InvitePolicy {
+  EVERYONE
+  PADIS_ONLY
+  NO_ONE
 }
 
 // --- Biometric login (WebAuthn/passkeys) ---
@@ -132,16 +177,16 @@ model Profile {
 // onboarding addition. One row per registered authenticator (a user could
 // register more than one device).
 model WebauthnCredential {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credentialId String   @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique
   publicKey    Bytes
-  counter      BigInt   @default(0)
+  counter      BigInt    @default(0)
   transports   String[]
   deviceType   String
-  backedUp     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
   lastUsedAt   DateTime?
 
   @@index([userId])
@@ -205,6 +250,16 @@ enum EventJoinPolicy {
   APPROVAL
 }
 
+// Hangouts at a listed venue wait for the venue to confirm before they go
+// live (Figma "Confirm with venue" / "Waiting" / "Confirmed" / "Rejected").
+// Hangouts at a free-form address skip this (NOT_REQUIRED).
+enum VenueApproval {
+  NOT_REQUIRED
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
 enum EventPrivacy {
   PUBLIC
   PRIVATE
@@ -225,11 +280,11 @@ enum EventStatus {
 }
 
 model Event {
-  id                 String             @id @default(uuid())
+  id                 String                                @id @default(uuid())
   hostId             String
-  host               User               @relation("EventHost", fields: [hostId], references: [id])
+  host               User                                  @relation("EventHost", fields: [hostId], references: [id])
   title              String
-  description        String?            @db.VarChar(2000)
+  description        String?                               @db.VarChar(2000)
   addressText        String
   latitude           Float
   longitude          Float
@@ -246,21 +301,37 @@ model Event {
   // Defaulted to APPROVAL for every host regardless of track record — the PRD
   // leaves the auto-approve-vs-approval default an open product question (see
   // plan §Open questions); APPROVAL is the safer choice until that's resolved.
-  joinPolicy         EventJoinPolicy    @default(APPROVAL)
-  privacy            EventPrivacy       @default(PUBLIC)
-  drinkCategory      EventDrinkCategory @default(BOTH)
-  status             EventStatus        @default(PUBLISHED)
+  joinPolicy         EventJoinPolicy                       @default(APPROVAL)
+  privacy            EventPrivacy                          @default(PUBLIC)
+  drinkCategory      EventDrinkCategory                    @default(BOTH)
+  // Interest tags (same vocabulary as Profile.interests / the Taste Picker),
+  // filtered by Home's interest chips.
+  tags               String[]                              @default([])
+  status             EventStatus                           @default(PUBLISHED)
+  venueId            String?
+  venue              Venue?                                @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  venueApproval      VenueApproval                         @default(NOT_REQUIRED)
+  // Set when the host sends the in-app confirmation request to the venue.
+  venueRequestedAt   DateTime?
+  venueRespondedAt   DateTime?
+  // Optional note from the venue with its decision (shown on rejection).
+  venueNote          String?                               @db.VarChar(500)
   cancelledAt        DateTime?
   cancelReason       String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime                              @default(now())
+  updatedAt          DateTime                              @updatedAt
 
   rsvps        Rsvp[]
+  invites      EventInvite[]
   conversation Conversation?
+  padiRatings  PadiRating[]
+  favorites    EventFavorite[]
 
   @@index([hostId])
+  @@index([venueId])
   @@index([startAt])
   @@index([status, startAt])
+  @@index([tags], type: Gin)
 }
 
 enum RsvpStatus {
@@ -280,6 +351,14 @@ model Rsvp {
   user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   status           RsvpStatus
   waitlistPosition Int?
+  // The requester's optional note to the host ("Message from Chidinma").
+  message          String?    @db.VarChar(280)
+  // The host's optional note sent back with an accept/decline.
+  decisionNote     String?    @db.VarChar(150)
+  // Entry pass shown as a QR code once approved; the host scans it at the
+  // door (check-in marks the RSVP ATTENDED). Generated on first view.
+  passCode         String?    @unique
+  checkedInAt      DateTime?
   respondedAt      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -291,22 +370,28 @@ model Rsvp {
   @@index([userId, status])
 }
 
-// Message/MessageReceipt land in the PadiChat phase — only the schema needed
-// to auto-create an event-scoped conversation on RSVP approval is built now.
+// PadiChat: event-scoped group chats (auto-created with the hangout, members
+// added on RSVP approval) and one-to-one DIRECT chats between padis.
 enum ConversationType {
   DIRECT
   EVENT
+  COMMUNITY
 }
 
 model Conversation {
   id            String           @id @default(uuid())
   type          ConversationType
   eventId       String?          @unique
+  // DIRECT only: the two user ids sorted and joined with ':' — one thread per pair.
+  directKey     String?          @unique
+  communityId   String?          @unique
+  community     Community?       @relation(fields: [communityId], references: [id], onDelete: Cascade)
   event         Event?           @relation(fields: [eventId], references: [id], onDelete: Cascade)
   lastMessageAt DateTime?
   createdAt     DateTime         @default(now())
 
   participants ConversationParticipant[]
+  messages     Message[]
 
   @@index([lastMessageAt])
 }
@@ -319,6 +404,8 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   joinedAt       DateTime     @default(now())
   leftAt         DateTime?
+  // Messages after this are unread for this participant.
+  lastReadAt     DateTime?
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -334,6 +421,13 @@ model ConversationParticipant {
 enum NotificationType {
   EVENT_CANCELLED
   EVENT_UPDATED
+  EVENT_INVITE
+  RSVP_REQUESTED
+  RSVP_APPROVED
+  RSVP_DECLINED
+  VENUE_CONFIRMED
+  VENUE_REJECTED
+  VENUE_REQUEST
 }
 
 enum NotificationChannel {
@@ -356,4 +450,281 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+// --- Home screen: venues/favourites, padis, statuses ---
+// Figma-only (Home node 590:8834), built at the user's explicit request ahead
+// of the PRD's Padi Deals / PadiRadar phases. Venues are seeded/admin-managed
+// reference data for now (no venue-owner accounts yet).
+
+enum VenueCategory {
+  RESTAURANT
+  LOUNGE
+  REGISTERED_LOUNGE
+  BAR
+  ROOFTOP
+  CAFE
+}
+
+model Venue {
+  id            String        @id @default(uuid())
+  name          String
+  category      VenueCategory
+  addressText   String
+  latitude      Float
+  longitude     Float
+  coverImageUrl String?
+  // Venue detail (Figma "Venue detail / Overview|Menu|Review|Events").
+  description   String?       @db.VarChar(1000)
+  phone         String?
+  photos        String[]      @default([])
+  amenities     String[]      @default([])
+  // Daily opening hours in Lagos time, "HH:mm". Null = hours unknown.
+  opensAt       String?
+  closesAt      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  favorites VenueFavorite[]
+  menuItems VenueMenuItem[]
+  reviews   VenueReview[]
+  events    Event[]
+
+  @@index([name])
+}
+
+model VenueFavorite {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, venueId])
+  @@index([userId, createdAt])
+}
+
+// Saved hangouts (the heart on a hangout card). Mirrors VenueFavorite.
+model EventFavorite {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, eventId])
+  @@index([userId, createdAt])
+}
+
+// One-directional, like "following": userId added padiId (e.g. via Scan padi).
+model PadiConnection {
+  userId    String
+  user      User     @relation("PadiOwner", fields: [userId], references: [id], onDelete: Cascade)
+  padiId    String
+  padi      User     @relation("PadiTarget", fields: [padiId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, padiId])
+  @@index([padiId])
+}
+
+// 24h status (story). Text and/or an image (uploaded to Cloudinary client-side).
+model PadiStatus {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String?  @db.VarChar(280)
+  imageUrl  String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  views StatusView[]
+
+  @@index([userId, expiresAt])
+}
+
+model StatusView {
+  statusId String
+  status   PadiStatus @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  viewerId String
+  viewer   User       @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  viewedAt DateTime   @default(now())
+
+  @@id([statusId, viewerId])
+  @@index([viewerId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String       @db.VarChar(2000)
+  // Client-generated id so a "tap to retry" resend can't create a duplicate.
+  clientId       String
+  createdAt      DateTime     @default(now())
+
+  @@unique([senderId, clientId])
+  @@index([conversationId, createdAt])
+}
+
+// --- Communities (Figma "Communities", html export node 560:3018) ---
+// Interest groups; each has its own group chat (Conversation type COMMUNITY).
+// Age range is informational until profiles carry a date of birth.
+
+enum CommunityRole {
+  OWNER
+  MEMBER
+}
+
+model Community {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(60)
+  description String   @db.VarChar(280)
+  emoji       String   @db.VarChar(16)
+  city        String   @db.VarChar(60)
+  minAge      Int      @default(18)
+  maxAge      Int      @default(99)
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  members      CommunityMember[]
+  conversation Conversation?
+
+  @@index([city])
+}
+
+model CommunityMember {
+  communityId String
+  community   Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        CommunityRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  @@id([communityId, userId])
+  @@index([userId])
+}
+
+// --- PadiRadar: opt-in live location for padis (Home "Padis" tab) ---
+// A row exists only while the user is sharing; turning sharing off deletes
+// it. Coordinates are stored pre-rounded (~100m) and shown only to people the
+// sharer has added as padis, and only while fresh (see RadarService).
+model LiveLocation {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latitude  Float
+  longitude Float
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+// Settings > Blocked padis. Blocking is one-way to create but hides both
+// people from each other (profiles, hangouts, chat, padis, radar).
+model Block {
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+enum SupportTopic {
+  HANGOUTS
+  REWARDS
+  REPORT_PADI
+  OTHER
+}
+
+// Settings > Contact us ("Or send us a message").
+model SupportMessage {
+  id        String       @id @default(uuid())
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  topic     SupportTopic
+  message   String       @db.VarChar(2000)
+  createdAt DateTime     @default(now())
+
+  @@index([createdAt])
+}
+
+model VenueMenuItem {
+  id        String @id @default(uuid())
+  venueId   String
+  venue     Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  section   String
+  name      String
+  priceKobo Int
+  position  Int    @default(0)
+
+  @@index([venueId, position])
+}
+
+model VenueReview {
+  id        String   @id @default(uuid())
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  body      String   @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One review per padi per venue; writing again edits it.
+  @@unique([venueId, userId])
+  @@index([venueId, createdAt])
+}
+
+// Padis the host invited from the "Invite padis" picker.
+model EventInvite {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+// PadiRadar "hide from this padi" (the eye toggle). One-way and silent: the
+// hider (userId) disappears from hiddenFrom's radar AND profile views, while
+// the padi connection and chats stay intact. Not a Block (which is mutual and
+// removes everything).
+model RadarHide {
+  userId       String
+  user         User     @relation("RadarHider", fields: [userId], references: [id], onDelete: Cascade)
+  hiddenFromId String
+  hiddenFrom   User     @relation("RadarHiddenFrom", fields: [hiddenFromId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@id([userId, hiddenFromId])
+  @@index([hiddenFromId])
+}
+
+// Peer rating between padis, unlocked only by a shared hangout (Padi Profile
+// "Padi score"). Mirrors VenueReview: one rating per rater→ratee per event,
+// re-submitting edits it. Score shown on cards/list/profile is the average.
+model PadiRating {
+  id        String   @id @default(uuid())
+  raterId   String
+  rater     User     @relation("PadiRater", fields: [raterId], references: [id], onDelete: Cascade)
+  rateeId   String
+  ratee     User     @relation("PadiRatee", fields: [rateeId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  stars     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raterId, rateeId, eventId])
+  @@index([rateeId])
 }

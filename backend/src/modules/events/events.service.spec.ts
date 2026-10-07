@@ -6,6 +6,15 @@ import { PrismaService } from '../../database/prisma.service';
 import { GoogleMapsService } from '../../integrations/google-maps/google-maps.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventsService } from './events.service';
+import { BlocksService } from '../blocks/blocks.service';
+
+function noBlocks() {
+  return {
+    hiddenUserIds: jest.fn().mockResolvedValue([]),
+    isBlockedEitherWay: jest.fn().mockResolvedValue(false),
+    assertNotBlocked: jest.fn(),
+  } as unknown as BlocksService;
+}
 
 function baseEventRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -45,7 +54,13 @@ function makeService() {
       findUniqueOrThrow: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    rsvp: { findMany: jest.fn().mockResolvedValue([]) },
+    rsvp: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    padiConnection: { findMany: jest.fn().mockResolvedValue([]) },
+    eventFavorite: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: (tx: unknown) => unknown) =>
       cb({
         event: {
@@ -68,7 +83,13 @@ function makeService() {
     notifyMany: jest.fn(),
   } as unknown as NotificationsService;
   return {
-    service: new EventsService(prisma, geo, googleMaps, notifications),
+    service: new EventsService(
+      prisma,
+      geo,
+      googleMaps,
+      notifications,
+      noBlocks(),
+    ),
     prisma,
     geo,
     googleMaps,
@@ -170,6 +191,91 @@ describe('EventsService', () => {
       expect(call.where.drinkCategory).toEqual({
         in: ['NON_ALCOHOLIC', 'BOTH'],
       });
+    });
+  });
+
+  describe('list search and Today', () => {
+    it('searches title and area case-insensitively alongside Under ₦2k', async () => {
+      const { service, prisma } = makeService();
+      await service.list({ limit: 20, q: 'roof', underTwoK: true });
+      const call = (prisma.event.findMany as jest.Mock).mock.calls[0][0] as {
+        where: { AND: unknown[] };
+      };
+      expect(call.where.AND).toEqual([
+        { OR: [{ priceKobo: null }, { priceKobo: { lte: 200_000 } }] },
+        {
+          OR: [
+            { title: { contains: 'roof', mode: 'insensitive' } },
+            { addressText: { contains: 'roof', mode: 'insensitive' } },
+          ],
+        },
+      ]);
+    });
+
+    it('caps Today at the end of the Lagos day', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T20:30:00Z'));
+      try {
+        const { service, prisma } = makeService();
+        await service.list({ limit: 20, today: true });
+        const call = (prisma.event.findMany as jest.Mock).mock.calls[0][0] as {
+          where: { startAt: { lte: Date } };
+        };
+        // 21:30 WAT -> midnight WAT is 22:59:59.999Z.
+        expect(call.where.startAt.lte.toISOString()).toBe(
+          '2026-10-02T22:59:59.999Z',
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("adds the viewer's RSVP status and padis-going count", async () => {
+      const { service, prisma } = makeService();
+      (prisma.event.findMany as jest.Mock).mockResolvedValue([baseEventRow()]);
+      (prisma.rsvp.findMany as jest.Mock).mockResolvedValue([
+        { eventId: 'event-1', status: 'REQUESTED' },
+      ]);
+      (prisma.padiConnection.findMany as jest.Mock).mockResolvedValue([
+        { padiId: 'padi-1' },
+        { padiId: 'padi-2' },
+      ]);
+      (prisma.rsvp.groupBy as jest.Mock).mockResolvedValue([
+        { eventId: 'event-1', _count: { _all: 2 } },
+      ]);
+      const page = await service.list({ limit: 20 }, 'viewer-1');
+      expect(page.items[0]).toMatchObject({
+        myRsvpStatus: 'REQUESTED',
+        padiCount: 2,
+      });
+    });
+
+    it('treats a cancelled RSVP as not joined', async () => {
+      const { service, prisma } = makeService();
+      (prisma.event.findMany as jest.Mock).mockResolvedValue([baseEventRow()]);
+      (prisma.rsvp.findMany as jest.Mock).mockResolvedValue([
+        { eventId: 'event-1', status: 'CANCELLED' },
+      ]);
+      const page = await service.list({ limit: 20 }, 'viewer-1');
+      expect(page.items[0].myRsvpStatus).toBeNull();
+    });
+  });
+
+  describe('getById', () => {
+    it('shows the host their pending request count', async () => {
+      const { service, prisma } = makeService();
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(baseEventRow());
+      (prisma.rsvp.count as jest.Mock).mockResolvedValue(3);
+      const detail = await service.getById('event-1', 'host-1');
+      expect(detail).toMatchObject({ isHost: true, pendingRequestCount: 3 });
+    });
+
+    it('never shows request counts to other users', async () => {
+      const { service, prisma } = makeService();
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(baseEventRow());
+      (prisma.rsvp.count as jest.Mock).mockResolvedValue(3);
+      const detail = await service.getById('event-1', 'someone-else');
+      expect(detail).toMatchObject({ isHost: false, pendingRequestCount: 0 });
+      expect(prisma.rsvp.count).not.toHaveBeenCalled();
     });
   });
 

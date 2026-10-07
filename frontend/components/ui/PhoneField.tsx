@@ -13,7 +13,7 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(function
 ) {
   return (
     <div className="w-full">
-      <div className={`flex h-[46px] w-full items-stretch overflow-hidden rounded-field border bg-white ${error ? "border-danger" : "border-border-subtle"}`}>
+      <div className={`flex h-[46px] w-full items-stretch overflow-hidden rounded-field border bg-card ${error ? "border-danger" : "border-border-subtle"}`}>
         <div className="flex shrink-0 items-center border-r border-border-subtle px-4">
           <span className="font-body text-sm text-body-text">+234</span>
         </div>
