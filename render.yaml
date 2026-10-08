@@ -1,8 +1,33 @@
-# Render Blueprint — Paddykonect backend (NestJS + Prisma + WebSockets)
+# Render Blueprint — Paddykonect (NestJS backend + Next.js frontend).
 # Deploy: Render Dashboard → New → Blueprint → connect paddykonect/padikonect.
 # DATABASE_URL + REDIS_URL are marked sync:false — paste them in the dashboard
 # (values are in backend/.env as DATABASE_URL_NEON and REDIS_URL_UPSTASH).
 services:
+  # ---------------------------------------------------------------------------
+  # Frontend — Next.js 16 (SSR web service)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: padikonect-web
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    # --include=dev: NODE_ENV=production makes npm skip devDeps, but the build
+    # needs typescript + tailwind. NEXT_PUBLIC_* must be set at BUILD time.
+    buildCommand: npm install --include=dev --no-audit --no-fund && npm run build
+    # next start reads $PORT; Render injects it. -p is explicit for safety.
+    startCommand: npm run start -- -p $PORT
+    autoDeploy: true
+    envVars:
+      # Build-time public vars. Point at the backend service below.
+      - key: NEXT_PUBLIC_API_URL
+        value: https://padikonect-api.onrender.com/api/v1
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # Backend — NestJS + Prisma + WebSockets
+  # ---------------------------------------------------------------------------
   - type: web
     name: padikonect-api
     runtime: node
