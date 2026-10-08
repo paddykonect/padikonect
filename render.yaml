@@ -7,7 +7,7 @@ services:
   # Frontend — Next.js 16 (SSR web service)
   # ---------------------------------------------------------------------------
   - type: web
-    name: padikonect-web
+    name: padikonect
     runtime: node
     plan: free
     region: oregon
