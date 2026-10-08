@@ -42,8 +42,16 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser());
 
+  // CORS_ORIGIN may be a comma-separated list (e.g. localhost + the Vercel url).
+  // Split into an array for exact matching; '*' reflects the request origin so
+  // credentialed requests still work (a literal '*' is rejected with credentials).
+  // Trailing slashes are stripped so the origin matches the browser's Origin header.
+  const corsOrigin = config.get<string>('app.corsOrigin') ?? '*';
   app.enableCors({
-    origin: config.get<string>('app.corsOrigin'),
+    origin:
+      corsOrigin === '*'
+        ? true
+        : corsOrigin.split(',').map((o) => o.trim().replace(/\/+$/, '')),
     credentials: true,
   });
 
