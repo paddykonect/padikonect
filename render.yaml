@@ -1,0 +1,81 @@
+# Render Blueprint — Paddykonect backend (NestJS + Prisma + WebSockets)
+# Deploy: Render Dashboard → New → Blueprint → connect paddykonect/padikonect.
+# DATABASE_URL + REDIS_URL are marked sync:false — paste them in the dashboard
+# (values are in backend/.env as DATABASE_URL_NEON and REDIS_URL_UPSTASH).
+services:
+  - type: web
+    name: padikonect-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    # prisma generate needs to run before the TS build (client is imported).
+    buildCommand: npm ci && npx prisma generate && npm run build
+    # migrate deploy runs against the live Neon DB on every deploy (idempotent),
+    # then the compiled server starts. dist path matches start:prod.
+    startCommand: npx prisma migrate deploy && node dist/src/main
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api
+      # Neon DIRECT url (DATABASE_URL_NEON). Paste in dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Upstash rediss:// url (REDIS_URL_UPSTASH). Paste in dashboard.
+      - key: REDIS_URL
+        sync: false
+      # Frontend origin for CORS — set to your Vercel URL after frontend deploys.
+      - key: CORS_ORIGIN
+        sync: false
+      # Auth secrets — generated once by Render, kept stable across deploys.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: OTP_HASH_PEPPER
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL_DEFAULT
+        value: 24h
+      - key: JWT_REFRESH_TTL_EXTENDED
+        value: 60d
+      # WebAuthn — RP_ID is the frontend HOSTNAME (no scheme), ORIGIN the full https url.
+      - key: WEBAUTHN_RP_NAME
+        value: Paddykonect
+      - key: WEBAUTHN_RP_ID
+        sync: false
+      - key: WEBAUTHN_ORIGIN
+        sync: false
+      # Cloudinary (image/file storage).
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Email (optional — leave blank to disable outbound mail).
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: MAIL_FROM
+        value: Paddykonect <no-reply@paddykonect.com>
+      - key: SUPPORT_EMAIL
+        sync: false
+      # Google sign-in (optional). Same value as frontend NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
