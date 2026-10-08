@@ -9,8 +9,11 @@ services:
     plan: free
     region: oregon
     rootDir: backend
-    # prisma generate needs to run before the TS build (client is imported).
-    buildCommand: npm ci && npx prisma generate && npm run build
+    # npm install (not ci): unrs-resolver's optional WASM bindings resolve to
+    # different @emnapi versions on Linux vs the Mac that generated the lockfile,
+    # which makes strict `npm ci` abort. `npm install` reconciles the drift.
+    # prisma generate must run before the TS build (client is imported).
+    buildCommand: npm install --no-audit --no-fund && npx prisma generate && npm run build
     # migrate deploy runs against the live Neon DB on every deploy (idempotent),
     # then the compiled server starts. dist path matches start:prod.
     startCommand: npx prisma migrate deploy && node dist/src/main
