@@ -33,7 +33,7 @@ export class RsvpController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: JoinEventDto,
   ) {
-    return this.rsvp.join(eventId, user.id, dto.message);
+    return this.rsvp.join(eventId, user.id, dto.message, dto.inviteCode);
   }
 
   @Get('me/pass')

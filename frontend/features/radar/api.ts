@@ -35,6 +35,11 @@ export function listRadarPadis(accessToken: string) {
   return apiRequest<RadarPadi[]>("/radar/padis", { method: "GET", accessToken });
 }
 
+/** "People near you": discoverable sharers near the viewer (not yet padis). */
+export function discoverPeople(accessToken: string, latitude: number, longitude: number) {
+  return apiRequest<RadarPadi[]>(`/radar/discover?lat=${latitude}&lng=${longitude}`, { method: "GET", accessToken });
+}
+
 /** Hide yourself from this padi (radar + profile) via the eye toggle. */
 export function hidePadi(accessToken: string, userId: string) {
   return apiRequest<{ hidden: boolean }>(`/radar/hide/${userId}`, { method: "POST", body: {}, accessToken });

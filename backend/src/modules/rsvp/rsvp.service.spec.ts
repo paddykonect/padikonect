@@ -52,6 +52,10 @@ function makeTx(
     },
     conversation: { findUnique: jest.fn().mockResolvedValue({ id: 'conv-1' }) },
     conversationParticipant: { upsert: jest.fn() },
+    profile: {
+      findUnique: jest.fn().mockResolvedValue({ padiPoints: 0 }),
+    },
+    eventInvite: { findUnique: jest.fn().mockResolvedValue(null) },
     ...overrides,
   };
 }
@@ -147,6 +151,62 @@ describe('RsvpService', () => {
       expect(rsvp.status).toBe('WAITLISTED');
       expect(rsvp.waitlistPosition).toBe(4);
       expect(tx.conversationParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('blocks a joiner below the membership (padi points) threshold', async () => {
+      const tx = makeTx(makeLockedEventRow({ minPadiPoints: 50 }));
+      tx.profile.findUnique.mockResolvedValue({ padiPoints: 10 });
+      const service = makeService(tx);
+      await expect(service.join('event-1', 'user-1')).rejects.toMatchObject({
+        code: 'MEMBERSHIP_REQUIRED',
+      });
+    });
+
+    it('allows a joiner at or above the membership threshold', async () => {
+      const tx = makeTx(
+        makeLockedEventRow({
+          minPadiPoints: 50,
+          joinPolicy: 'OPEN',
+          capacity: 5,
+        }),
+      );
+      tx.profile.findUnique.mockResolvedValue({ padiPoints: 50 });
+      const service = makeService(tx);
+      const rsvp = (await service.join('event-1', 'user-1')) as {
+        status: string;
+      };
+      expect(rsvp.status).toBe('APPROVED');
+    });
+
+    it('blocks an invite-only hangout without an invite or share code', async () => {
+      const tx = makeTx(
+        makeLockedEventRow({ privacy: 'INVITE_ONLY', inviteCode: 'abc' }),
+      );
+      const service = makeService(tx);
+      await expect(service.join('event-1', 'user-1')).rejects.toMatchObject({
+        code: 'INVITE_REQUIRED',
+      });
+    });
+
+    it('lets a guest into an invite-only hangout with a matching share code', async () => {
+      const tx = makeTx(
+        makeLockedEventRow({
+          privacy: 'INVITE_ONLY',
+          inviteCode: 'abc',
+          joinPolicy: 'OPEN',
+          capacity: 5,
+        }),
+      );
+      const service = makeService(tx);
+      const rsvp = (await service.join(
+        'event-1',
+        'user-1',
+        undefined,
+        'abc',
+      )) as {
+        status: string;
+      };
+      expect(rsvp.status).toBe('APPROVED');
     });
   });
 

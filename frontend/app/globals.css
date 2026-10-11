@@ -104,7 +104,33 @@ html[data-theme="dark"] img[src$="/icons/settings/user.svg"] {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* Dark map tiles (pins and overlays are unaffected). */
-html[data-theme="dark"] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+/* Dual-handle range slider (the "Age" field in the Host-a-hangout wizard).
+ * Both inputs overlap; only the thumbs capture pointer events so each handle
+ * can be dragged independently over a shared track. */
+.dual-range {
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.dual-range::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.dual-range::-moz-range-thumb {
+  pointer-events: auto;
+  height: 20px;
+  width: 20px;
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  cursor: pointer;
 }

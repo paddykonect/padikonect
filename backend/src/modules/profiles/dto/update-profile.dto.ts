@@ -96,4 +96,11 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   locationServices?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Settings > Discoverable on radar (People near you)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  radarDiscoverable?: boolean;
 }

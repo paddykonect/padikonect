@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
@@ -12,15 +12,16 @@ import { useAuth } from "@/features/auth/auth-context";
 import { RequireAuth } from "@/features/auth/require-auth";
 import * as eventsApi from "@/features/events/api";
 import { EventDetail, EventPerson } from "@/features/events/types";
-import { ScanIcon, TicketIcon } from "@/features/hangouts/components/icons";
+import { CopyIcon, PeopleIcon, PhoneIcon, ScanIcon, TicketIcon } from "@/features/hangouts/components/icons";
 import { directionsUrl, goingLabel } from "@/features/hangouts/places";
 import * as padisApi from "@/features/padis/api";
 import { PadiUser } from "@/features/padis/types";
 import { RequireCountry } from "@/features/profile/require-country";
 import { ApiError } from "@/lib/api/client";
+import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 import { formatDateTime } from "@/lib/format/time";
 
-const LeafletMap = dynamic(() => import("@/features/home/components/LeafletMap"), {
+const MapView = dynamic(() => import("@/features/home/components/GoogleMap"), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-[#eef3e9]" />,
 });
@@ -57,6 +58,9 @@ function joinAction(event: EventDetail): { label: string; kind: "join" | "leave"
 function HangoutDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Share-link token (/hangouts/:id?invite=…) lets a guest join an invite-only hangout.
+  const inviteCode = searchParams.get("invite") ?? undefined;
   const { accessToken } = useAuth();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [padis, setPadis] = useState<PadiUser[]>([]);
@@ -113,7 +117,7 @@ function HangoutDetailContent() {
     setError(null);
     try {
       if (kind === "join") {
-        await eventsApi.joinEvent(accessToken, event.id, joinMessage.trim() || undefined);
+        await eventsApi.joinEvent(accessToken, event.id, joinMessage.trim() || undefined, inviteCode);
         setJoinOpen(false);
         setJoinMessage("");
       } else await eventsApi.leaveEvent(accessToken, event.id);
@@ -180,15 +184,10 @@ function HangoutDetailContent() {
         </button>
       </div>
 
-      <div className="relative h-[348px] w-full shrink-0 bg-[#eef3e9]">
-        {event.coverImageUrl ? (
-          <Image src={event.coverImageUrl} alt="" fill sizes="430px" className="object-cover" unoptimized priority />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-6xl" aria-hidden>
-            🎉
-          </span>
-        )}
-      </div>
+      <PhotoGallery
+        urls={event.media.length ? event.media.map((m) => m.url) : event.coverImageUrl ? [event.coverImageUrl] : []}
+        emoji={event.emoji}
+      />
 
       <main className="flex flex-col gap-5 px-5 pt-4">
         <div className="flex flex-col gap-2">
@@ -221,11 +220,23 @@ function HangoutDetailContent() {
               {event.addressText}
             </p>
           )}
+          <p className="flex items-center gap-2.5 font-body text-sm leading-5 text-heading">
+            <PeopleIcon size={18} className="shrink-0 text-heading" />
+            {event.minJoiners ? `Min ${event.minJoiners} · ` : ""}max {event.capacity} padis
+            {event.language ? ` · ${event.language}` : ""}
+            {event.minAge != null && event.maxAge != null ? ` · ages ${event.minAge}–${event.maxAge}` : ""}
+          </p>
+          {event.minPadiPoints != null && (
+            <p className="flex items-center gap-2.5 font-body text-sm leading-5 text-heading">
+              <TicketIcon size={18} className="shrink-0 text-heading" />
+              Members only · {event.minPadiPoints}+ padi points to join
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col overflow-hidden rounded-2xl bg-card">
           <div className="relative isolate h-[175px] w-full">
-            <LeafletMap
+            <MapView
               center={[event.latitude, event.longitude]}
               pins={[{ id: event.id, latitude: event.latitude, longitude: event.longitude, emoji: "", dot: true, label: event.addressText }]}
               selectedId={null}
@@ -282,6 +293,13 @@ function HangoutDetailContent() {
 
         {event.description && <p className="whitespace-pre-line font-body text-sm leading-5 text-heading">{event.description}</p>}
 
+        {event.hostIntro && (
+          <div className="flex flex-col gap-1.5 rounded-2xl bg-toggle-bg p-3.5">
+            <h2 className="font-body text-xs font-bold uppercase tracking-[0.36px] text-body-text">A note from {event.isHost ? "you" : hostName}</h2>
+            <p className="whitespace-pre-line font-body text-sm leading-5 text-heading">{event.hostIntro}</p>
+          </div>
+        )}
+
         {error && <p className="font-body text-sm text-danger">{error}</p>}
 
         {event.isHost && event.status !== "CANCELLED" && (event.venueApproval === "PENDING" || event.venueApproval === "REJECTED") && event.venue && (
@@ -316,6 +334,7 @@ function HangoutDetailContent() {
                 <Image src="/icons/hangout/invite.svg" alt="" width={16} height={16} />
               </Link>
             </div>
+            <HostInviteExtras eventId={event.id} onToast={setToast} />
             {!event.isEnded && event.status !== "CANCELLED" && (
               <Link
                 href={`/hangouts/${event.id}/scan`}
@@ -421,11 +440,91 @@ function HangoutDetailContent() {
   );
 }
 
+// Figma "Personalize" gallery: a swipeable row of photos with page dots.
+// Falls back to the cover image, then an emoji placeholder.
+function PhotoGallery({ urls, emoji }: { urls: string[]; emoji: string | null }) {
+  const [index, setIndex] = useState(0);
+  return (
+    <div className="relative h-[348px] w-full shrink-0 bg-[#eef3e9]">
+      {urls.length === 0 ? (
+        <span className="absolute inset-0 flex items-center justify-center text-6xl" aria-hidden>
+          {emoji || "🎉"}
+        </span>
+      ) : (
+        <>
+          <div
+            className="flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              setIndex(Math.round(el.scrollLeft / el.clientWidth));
+            }}
+          >
+            {urls.map((url, i) => (
+              <div key={url} className="relative h-full w-full shrink-0 snap-center">
+                <Image src={cloudinaryDisplayUrl(url, { width: 860 })} alt="" fill sizes="430px" className="object-cover" unoptimized priority={i === 0} />
+              </div>
+            ))}
+          </div>
+          {urls.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center gap-1.5">
+              {urls.map((_, i) => (
+                <span key={i} className={`size-1.5 rounded-full ${i === index ? "bg-white" : "bg-white/50"}`} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Host-only: the share link (copy) and the numbers invited by phone. SMS send
+// isn't wired up, so the host shares the link with those numbers manually.
+function HostInviteExtras({ eventId, onToast }: { eventId: string; onToast: (t: string) => void }) {
+  const { accessToken } = useAuth();
+  const [path, setPath] = useState<string | null>(null);
+  const [phones, setPhones] = useState<string[]>([]);
+  useEffect(() => {
+    if (!accessToken) return;
+    eventsApi.getInviteLink(accessToken, eventId).then((r) => setPath(r.path)).catch(() => undefined);
+    eventsApi.listPhoneInvites(accessToken, eventId).then(setPhones).catch(() => undefined);
+  }, [accessToken, eventId]);
+  if (!path) return null;
+  const url = `${typeof window !== "undefined" ? window.location.origin : ""}${path}`;
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      onToast("Invite link copied");
+    } catch {
+      onToast("Couldn't copy. Please try again.");
+    }
+  }
+  return (
+    <div className="mt-1 flex flex-col gap-2">
+      <button type="button" onClick={() => void copyLink()} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left">
+        <span className="min-w-0 flex-1 truncate font-body text-[13px] text-body-text">{url}</span>
+        <CopyIcon size={16} className="shrink-0 text-heading" />
+      </button>
+      {phones.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <PhoneIcon size={14} className="text-body-text" />
+          <span className="font-body text-xs text-body-text">
+            Invited by phone: {phones.join(", ")}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HangoutDetailPage() {
   return (
     <RequireAuth>
       <RequireCountry>
-        <HangoutDetailContent />
+        {/* useSearchParams (the ?invite= token) needs a Suspense boundary. */}
+        <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+          <HangoutDetailContent />
+        </Suspense>
       </RequireCountry>
     </RequireAuth>
   );

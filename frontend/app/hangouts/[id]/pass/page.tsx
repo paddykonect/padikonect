@@ -16,7 +16,7 @@ import { RequireCountry } from "@/features/profile/require-country";
 import { ApiError } from "@/lib/api/client";
 import { formatDayTime } from "@/lib/format/time";
 
-const LeafletMap = dynamic(() => import("@/features/home/components/LeafletMap"), {
+const MapView = dynamic(() => import("@/features/home/components/GoogleMap"), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-[#eef3e9]" />,
 });
@@ -65,7 +65,7 @@ function PassContent() {
 
       <section className="flex flex-col overflow-hidden rounded-2xl bg-card">
         <div className="relative isolate h-[175px] w-full">
-          <LeafletMap
+          <MapView
             center={[event.latitude, event.longitude]}
             pins={[{ id: event.id, latitude: event.latitude, longitude: event.longitude, emoji: "", dot: true, label: event.addressText }]}
             selectedId={null}

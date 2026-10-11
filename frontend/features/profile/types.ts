@@ -19,6 +19,7 @@ export interface OwnProfile {
   invitePolicy: InvitePolicy;
   pushNotifications: boolean;
   locationServices: boolean;
+  radarDiscoverable: boolean;
   membershipStatus: "FREE" | "PREMIUM";
   padiPoints: number;
   hostedCount: number;
@@ -45,6 +46,7 @@ export interface UpdateProfileInput {
   invitePolicy?: InvitePolicy;
   pushNotifications?: boolean;
   locationServices?: boolean;
+  radarDiscoverable?: boolean;
 }
 
 export const DRINK_PREFERENCE_LABEL: Record<DrinkPreference, string> = {

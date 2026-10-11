@@ -13,6 +13,7 @@ import {
   otpConfig,
   redisConfig,
   sentryConfig,
+  smsConfig,
   webauthnConfig,
 } from './config/configuration';
 import { validateEnv } from './config/env.validation';
@@ -57,6 +58,7 @@ import { VenuesModule } from './modules/venues/venues.module';
         googleMapsConfig,
         googleAuthConfig,
         webauthnConfig,
+        smsConfig,
       ],
       validate: validateEnv,
     }),

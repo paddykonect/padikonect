@@ -1,5 +1,6 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { EventDrinkCategory, EventPrivacy } from '@prisma/client';
+import { EventDrinkCategory, EventPrivacy, MediaType } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
@@ -17,7 +18,30 @@ import {
   MinLength,
   ArrayMaxSize,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
+
+export class CreateEventMediaDto {
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  url!: string;
+
+  @IsString()
+  publicId!: string;
+
+  @IsOptional()
+  @IsEnum(MediaType)
+  type?: MediaType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  width?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  height?: number;
+}
 
 export class CreateEventDto {
   @ApiProperty()
@@ -111,4 +135,75 @@ export class CreateEventDto {
   @IsOptional()
   @IsEnum(EventPrivacy)
   privacy?: EventPrivacy;
+
+  @ApiPropertyOptional({ description: 'Activity emoji (the "Customize" step)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  emoji?: string;
+
+  @ApiPropertyOptional({ description: 'Host "Introduce yourself" message' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  hostIntro?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  startingGroupSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Minimum joiners needed for the hangout',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  minJoiners?: number;
+
+  @ApiPropertyOptional({
+    description: 'Preferred minimum joiner age (the "Age" slider)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(16)
+  @Max(120)
+  minAge?: number;
+
+  @ApiPropertyOptional({
+    description: 'Preferred maximum joiner age (the "Age" slider)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(16)
+  @Max(120)
+  maxAge?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  language?: string;
+
+  @ApiPropertyOptional({
+    description: 'Membership gate: min padi points to join',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minPadiPoints?: number;
+
+  @ApiPropertyOptional({
+    type: [CreateEventMediaDto],
+    description: 'Hangout photos (max 6); the first is the cover',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => CreateEventMediaDto)
+  media?: CreateEventMediaDto[];
 }

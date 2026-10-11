@@ -56,6 +56,14 @@ export const envSchema = z.object({
   WEBAUTHN_RP_NAME: z.string().default('Paddykonect'),
   WEBAUTHN_RP_ID: z.string().default('localhost'),
   WEBAUTHN_ORIGIN: z.string().default('http://localhost:3001'),
+
+  // --- Shareable links + SMS invites (Host a hangout → Invite by phone) ---
+  // Public web origin used to build invite links sent over SMS.
+  APP_WEB_URL: z.string().default('http://localhost:3001'),
+  // Africa's Talking — optional; SMS invites no-op (with a warning) until set.
+  AFRICASTALKING_API_KEY: z.string().optional().default(''),
+  AFRICASTALKING_USERNAME: z.string().default('sandbox'),
+  AFRICASTALKING_SENDER_ID: z.string().optional().default(''),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

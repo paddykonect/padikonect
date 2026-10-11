@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   Event,
+  MediaType,
   Prisma,
   RsvpStatus,
   Venue,
@@ -52,9 +53,17 @@ type EventWithHost = Event & {
 // the host until the venue confirms.
 const LIVE_VENUE_APPROVAL: VenueApproval[] = ['NOT_REQUIRED', 'CONFIRMED'];
 
+export interface EventMediaView {
+  url: string;
+  type: MediaType;
+  width: number | null;
+  height: number | null;
+}
+
 export interface EventListItemView {
   id: string;
   title: string;
+  emoji: string | null;
   coverImageUrl: string | null;
   addressText: string;
   latitude: number;
@@ -89,6 +98,16 @@ const NO_VIEWER: ViewerFields = {
 
 export type EventDetailView = EventListItemView & {
   description: string | null;
+  hostIntro: string | null;
+  language: string | null;
+  startingGroupSize: number;
+  minJoiners: number | null;
+  minAge: number | null;
+  maxAge: number | null;
+  minPadiPoints: number | null;
+  media: EventMediaView[];
+  /** Share-link token — only exposed to the host. */
+  inviteCode: string | null;
   privacy: Event['privacy'];
   cancelReason: string | null;
   isHost: boolean;
@@ -106,6 +125,8 @@ export type EventDetailView = EventListItemView & {
   venueNote: string | null;
 };
 
+type EventWithDetail = EventWithHost & { media: EventMediaView[] };
+
 function isEnded(event: Pick<Event, 'startAt' | 'endAt'>): boolean {
   return (event.endAt ?? event.startAt) < new Date();
 }
@@ -117,6 +138,7 @@ function toListItem(
   return {
     id: event.id,
     title: event.title,
+    emoji: event.emoji,
     coverImageUrl: event.coverImageUrl,
     addressText: event.addressText,
     latitude: event.latitude,
@@ -140,7 +162,7 @@ function toListItem(
 }
 
 function toDetailView(
-  event: EventWithHost,
+  event: EventWithDetail,
   extra?: Partial<
     Pick<
       EventDetailView,
@@ -152,9 +174,20 @@ function toDetailView(
     >
   >,
 ): EventDetailView {
+  const isHost = extra?.isHost ?? false;
   return {
     ...toListItem(event),
     description: event.description,
+    hostIntro: event.hostIntro,
+    language: event.language,
+    startingGroupSize: event.startingGroupSize,
+    minJoiners: event.minJoiners,
+    minAge: event.minAge,
+    maxAge: event.maxAge,
+    minPadiPoints: event.minPadiPoints,
+    media: event.media,
+    // Only the host gets the share-link token.
+    inviteCode: isHost ? event.inviteCode : null,
     privacy: event.privacy,
     cancelReason: event.cancelReason,
     isHost: false,
@@ -192,6 +225,15 @@ const attendeeInclude = {
     select: {
       rsvps: { where: { status: { in: GOING } } },
     },
+  },
+} satisfies Prisma.EventInclude;
+
+// Detail view also loads the photo gallery (ordered); lists don't need it.
+const detailInclude = {
+  ...attendeeInclude,
+  media: {
+    select: { url: true, type: true, width: true, height: true },
+    orderBy: { position: 'asc' },
   },
 } satisfies Prisma.EventInclude;
 
@@ -252,6 +294,19 @@ export class EventsService {
     const endAt = dto.endAt ? new Date(dto.endAt) : undefined;
     this.validateTimes(startAt, endAt);
 
+    if (
+      (dto.minJoiners && dto.minJoiners > dto.capacity) ||
+      (dto.startingGroupSize && dto.startingGroupSize > dto.capacity)
+    ) {
+      throw new AppException(
+        'INVALID_GROUP_SIZE',
+        'Starting group and minimum joiners must not exceed the maximum.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // The first photo is the cover (kept on Event for cards/map/favorites).
+    const cover = dto.media?.[0];
     const venue = dto.venueId ? await this.findVenue(dto.venueId) : null;
     const { latitude, longitude } = venue
       ? venue
@@ -277,14 +332,36 @@ export class EventsService {
           startAt,
           endAt,
           capacity: dto.capacity,
+          startingGroupSize: dto.startingGroupSize,
+          minJoiners: dto.minJoiners,
+          minAge: dto.minAge,
+          maxAge: dto.maxAge,
           priceKobo: dto.priceKobo,
-          coverImageUrl: dto.coverImageUrl,
+          coverImageUrl: cover?.url ?? dto.coverImageUrl,
+          coverImagePublicId: cover?.publicId,
+          emoji: dto.emoji,
+          hostIntro: dto.hostIntro,
+          language: dto.language,
+          minPadiPoints: dto.minPadiPoints,
           drinkCategory: dto.drinkCategory,
           tags: dto.tags,
           privacy: dto.privacy,
         },
         include: attendeeInclude,
       });
+      if (dto.media?.length) {
+        await tx.eventMedia.createMany({
+          data: dto.media.map((m, i) => ({
+            eventId: created.id,
+            url: m.url,
+            publicId: m.publicId,
+            type: m.type ?? 'IMAGE',
+            width: m.width,
+            height: m.height,
+            position: i,
+          })),
+        });
+      }
       await this.geo.syncEventLocation(tx, created.id, latitude, longitude);
 
       const conversation = await tx.conversation.create({
@@ -297,7 +374,7 @@ export class EventsService {
       return created;
     });
 
-    return toDetailView(event);
+    return this.getById(event.id, hostId);
   }
 
   /** Hangouts you host or were approved for, most recent first (Profile "Your hangouts"). */
@@ -333,7 +410,7 @@ export class EventsService {
   ): Promise<EventDetailView> {
     const event = await this.prisma.event.findUnique({
       where: { id },
-      include: attendeeInclude,
+      include: detailInclude,
     });
     const hiddenFromViewer =
       event &&
@@ -380,6 +457,25 @@ export class EventsService {
         photoUrl: r.user.profile?.photoUrl ?? null,
       })),
     });
+  }
+
+  /** Resolve a share-link code to the hangout it points at. */
+  async getByInviteCode(
+    code: string,
+    viewerId?: string,
+  ): Promise<EventDetailView> {
+    const event = await this.prisma.event.findUnique({
+      where: { inviteCode: code },
+      select: { id: true },
+    });
+    if (!event) {
+      throw new AppException(
+        'INVITE_INVALID',
+        'This invite link is no longer valid.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return this.getById(event.id, viewerId);
   }
 
   /** The viewer's RSVP status and padis-going count for each event. */
@@ -630,6 +726,24 @@ export class EventsService {
           ...(dto.drinkCategory !== undefined && {
             drinkCategory: dto.drinkCategory,
           }),
+          ...(dto.emoji !== undefined && { emoji: dto.emoji }),
+          ...(dto.hostIntro !== undefined && { hostIntro: dto.hostIntro }),
+          ...(dto.language !== undefined && { language: dto.language }),
+          ...(dto.startingGroupSize !== undefined && {
+            startingGroupSize: dto.startingGroupSize,
+          }),
+          ...(dto.minJoiners !== undefined && { minJoiners: dto.minJoiners }),
+          ...(dto.minAge !== undefined && { minAge: dto.minAge }),
+          ...(dto.maxAge !== undefined && { maxAge: dto.maxAge }),
+          ...(dto.minPadiPoints !== undefined && {
+            minPadiPoints: dto.minPadiPoints,
+          }),
+          // Replacing the gallery also refreshes the cover (first photo).
+          ...(dto.media !== undefined &&
+            dto.media.length > 0 && {
+              coverImageUrl: dto.media[0].url,
+              coverImagePublicId: dto.media[0].publicId,
+            }),
           ...(venue && { venueId: venue.id }),
           ...(resubmit &&
             (venue || existing.venueId) && {
@@ -639,8 +753,24 @@ export class EventsService {
               venueNote: null,
             }),
         },
-        include: attendeeInclude,
+        include: detailInclude,
       });
+      if (dto.media !== undefined) {
+        await tx.eventMedia.deleteMany({ where: { eventId: id } });
+        if (dto.media.length > 0) {
+          await tx.eventMedia.createMany({
+            data: dto.media.map((m, i) => ({
+              eventId: id,
+              url: m.url,
+              publicId: m.publicId,
+              type: m.type ?? 'IMAGE',
+              width: m.width,
+              height: m.height,
+              position: i,
+            })),
+          });
+        }
+      }
       if (locationChanged)
         await this.geo.syncEventLocation(tx, id, latitude, longitude);
       return ev;
@@ -660,7 +790,7 @@ export class EventsService {
       );
     }
 
-    return toDetailView(updated);
+    return this.getById(id, existing.hostId);
   }
 
   async cancel(id: string, dto: CancelEventDto): Promise<EventDetailView> {
@@ -682,7 +812,7 @@ export class EventsService {
         cancelledAt: new Date(),
         cancelReason: dto.reason,
       },
-      include: attendeeInclude,
+      include: detailInclude,
     });
 
     const affected = await this.prisma.rsvp.findMany({

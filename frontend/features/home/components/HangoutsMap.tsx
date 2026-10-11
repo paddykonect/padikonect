@@ -5,10 +5,10 @@ import Image from "next/image";
 import { ReactNode, useMemo, useState } from "react";
 import { Place } from "@/features/hangouts/places";
 import { VENUE_CATEGORY_EMOJI } from "@/features/venues/types";
-import type { MapPin } from "./LeafletMap";
+import type { MapPin } from "./GoogleMap";
 
 // Leaflet touches `window`, so it can only load in the browser.
-const LeafletMap = dynamic(() => import("./LeafletMap"), {
+const MapView = dynamic(() => import("./GoogleMap"), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-[#eef3e9]" />,
 });
@@ -63,7 +63,7 @@ export function HangoutsMap({ center, isUserLocation, places, selectedKey, onSel
     // `isolate` keeps Leaflet's internal z-indexes (400+) from painting over
     // sheets and overlays.
     <div className={`relative isolate w-full overflow-hidden bg-[#eef3e9] ${showFull ? "flex-1" : "h-[420px] rounded-[18px]"}`}>
-      <LeafletMap center={center} pins={pins} selectedId={selectedKey} onSelect={(id) => id && onSelect(id)} resizeKey={resizeKey} />
+      <MapView center={center} pins={pins} selectedId={selectedKey} onSelect={(id) => id && onSelect(id)} resizeKey={resizeKey} />
 
       <div className="pointer-events-none absolute inset-x-3 top-3 z-[500] flex items-start justify-between">
         <span className="flex items-center gap-[5px] rounded-full bg-card px-3 py-1.5 shadow-[0px_2px_4px_rgba(0,0,0,0.1)]">

@@ -17,6 +17,7 @@ import { FavoritesRow } from "@/features/home/components/FavoritesRow";
 import { FilterPills, HomeFilter } from "@/features/home/components/FilterPills";
 import { HangoutsMap } from "@/features/home/components/HangoutsMap";
 import { HomeHeader } from "@/features/home/components/HomeHeader";
+import { NextHangout } from "@/features/home/components/NextHangout";
 import { PadisPanel } from "@/features/home/components/PadisPanel";
 import { RewardsCard } from "@/features/home/components/RewardsCard";
 import { StatusComposer } from "@/features/home/components/StatusComposer";
@@ -75,6 +76,8 @@ function HomeContent() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [favorites, setFavorites] = useState<Venue[]>([]);
   const [favoriteEvents, setFavoriteEvents] = useState<EventListItem[]>([]);
+  // undefined = loading, null = no upcoming hangout, else the soonest one.
+  const [nextHangout, setNextHangout] = useState<EventListItem | null | undefined>(undefined);
   const [events, setEvents] = useState<EventListItem[]>([]);
   const [view, setView] = useState<HomeView>("hangouts");
   const [filters, setFilters] = useState<Set<HomeFilter>>(new Set());
@@ -101,6 +104,14 @@ function HomeContent() {
     venuesApi.listVenues(accessToken).then((page) => setVenues(page.items)).catch(() => undefined);
     venuesApi.listFavoriteVenues(accessToken).then(setFavorites).catch(() => undefined);
     eventsApi.listFavoriteEvents(accessToken).then(setFavoriteEvents).catch(() => undefined);
+    // "Your next hangout": the soonest hangout you host or are going to.
+    eventsApi
+      .listMyEvents(accessToken)
+      .then((list) => {
+        const upcoming = list.filter((e) => !e.isEnded).sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
+        setNextHangout(upcoming[0] ?? null);
+      })
+      .catch(() => setNextHangout(null));
   }, [accessToken]);
 
   // Use the user's location only if they've already granted it — never prompt
@@ -300,6 +311,17 @@ function HomeContent() {
             </h1>
 
             <StatusRow me={me} groups={statusGroups} onAdd={() => setComposerOpen(true)} onOpen={setViewerStart} />
+
+            <NextHangout
+              event={nextHangout ?? null}
+              loading={nextHangout === undefined}
+              userId={user?.id}
+              onViewAll={() => {
+                setView("hangouts");
+                setListMode(true);
+                window.scrollTo({ top: 0 });
+              }}
+            />
 
             <FavoritesRow
               venues={favorites}

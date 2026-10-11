@@ -24,6 +24,7 @@ import { CancelEventDto } from './dto/cancel-event.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { ListEventsQueryDto } from './dto/list-events-query.dto';
 import { InvitePadisDto } from './dto/invite-padis.dto';
+import { SetPhoneInvitesDto } from './dto/set-phone-invites.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { VenueResponseDto } from './dto/venue-response.dto';
 import { EventsService } from './events.service';
@@ -100,6 +101,16 @@ export class EventsController {
     return this.hosting.listVenueRequests();
   }
 
+  // Resolve a share link: /events/invite/:code (two segments, never collides
+  // with the single-segment :id route).
+  @Get('invite/:code')
+  getByInviteCode(
+    @Param('code') code: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.events.getByInviteCode(code, user.id);
+  }
+
   @Get(':id')
   getById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.events.getById(id, user.id, user.role === 'ADMIN');
@@ -156,6 +167,24 @@ export class EventsController {
     @Body() dto: InvitePadisDto,
   ) {
     return this.hosting.invite(id, user.id, dto.userIds);
+  }
+
+  @Get(':id/invite-link')
+  @UseGuards(EventHostGuard)
+  inviteLink(@Param('id') id: string) {
+    return this.hosting.getInviteLink(id);
+  }
+
+  @Get(':id/phone-invites')
+  @UseGuards(EventHostGuard)
+  listPhoneInvites(@Param('id') id: string) {
+    return this.hosting.listPhoneInvites(id);
+  }
+
+  @Post(':id/phone-invites')
+  @UseGuards(EventHostGuard)
+  setPhoneInvites(@Param('id') id: string, @Body() dto: SetPhoneInvitesDto) {
+    return this.hosting.setPhoneInvites(id, dto.phones);
   }
 
   private assertAdmin(user: AuthenticatedUser): void {

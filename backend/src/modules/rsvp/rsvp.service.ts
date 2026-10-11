@@ -27,6 +27,8 @@ interface LockedEvent {
   joinPolicy: string;
   privacy: string;
   venueApproval: string;
+  minPadiPoints: number | null;
+  inviteCode: string | null;
 }
 
 export interface PendingRsvpView {
@@ -99,7 +101,7 @@ export class RsvpService {
   ): Promise<LockedEvent | undefined> {
     const rows = await tx.$queryRaw<LockedEvent[]>`
       SELECT "id", "hostId", "title", "capacity", "status", "startAt", "endAt", "joinPolicy",
-             "privacy", "venueApproval"
+             "privacy", "venueApproval", "minPadiPoints", "inviteCode"
       FROM "Event" WHERE "id" = ${eventId} FOR UPDATE
     `;
     return rows[0];
@@ -134,7 +136,12 @@ export class RsvpService {
     return (agg._max.waitlistPosition ?? 0) + 1;
   }
 
-  async join(eventId: string, userId: string, message?: string): Promise<Rsvp> {
+  async join(
+    eventId: string,
+    userId: string,
+    message?: string,
+    inviteCode?: string,
+  ): Promise<Rsvp> {
     const result = await this.prisma.$transaction(async (tx) => {
       const event = await this.lockEvent(tx, eventId);
       // A host who blocked you (or whom you blocked) — the hangout is "not found".
@@ -160,13 +167,32 @@ export class RsvpService {
         );
       }
       if (event.privacy === 'INVITE_ONLY') {
-        const invite = await tx.eventInvite.findUnique({
-          where: { eventId_userId: { eventId, userId } },
+        // A matching share-link code is as good as a personal invite.
+        const hasShareCode =
+          !!inviteCode && !!event.inviteCode && inviteCode === event.inviteCode;
+        if (!hasShareCode) {
+          const invite = await tx.eventInvite.findUnique({
+            where: { eventId_userId: { eventId, userId } },
+          });
+          if (!invite) {
+            throw new AppException(
+              'INVITE_REQUIRED',
+              'This hangout is invite-only.',
+              HttpStatus.FORBIDDEN,
+            );
+          }
+        }
+      }
+      // Membership gate: the host can require a minimum padi-points balance.
+      if (event.minPadiPoints != null && event.minPadiPoints > 0) {
+        const profile = await tx.profile.findUnique({
+          where: { userId },
+          select: { padiPoints: true },
         });
-        if (!invite) {
+        if ((profile?.padiPoints ?? 0) < event.minPadiPoints) {
           throw new AppException(
-            'INVITE_REQUIRED',
-            'This hangout is invite-only.',
+            'MEMBERSHIP_REQUIRED',
+            `You need at least ${event.minPadiPoints} padi points to join this hangout.`,
             HttpStatus.FORBIDDEN,
           );
         }
