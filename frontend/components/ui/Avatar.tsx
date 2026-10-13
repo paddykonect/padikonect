@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 
 interface AvatarProps {
   name: string;
@@ -20,7 +21,9 @@ export function Avatar({ name, photoUrl, size, className = "" }: AvatarProps) {
       style={{ width: size, height: size }}
     >
       {photoUrl ? (
-        <Image src={photoUrl} alt="" fill sizes={`${size}px`} className="object-cover" unoptimized />
+        // f_auto converts HEIC phone uploads to a browser-friendly format;
+        // without it iPhone avatars render blank. 2x width for retina crispness.
+        <Image src={cloudinaryDisplayUrl(photoUrl, { width: size * 2 })} alt="" fill sizes={`${size}px`} className="object-cover" unoptimized />
       ) : (
         <span className="font-body font-bold text-[#1b3b2b]" style={{ fontSize: Math.max(8, size * 0.36) }}>
           {initials(name)}

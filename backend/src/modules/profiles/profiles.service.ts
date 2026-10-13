@@ -38,6 +38,7 @@ export interface OwnProfileView {
   invitePolicy: Profile['invitePolicy'];
   pushNotifications: boolean;
   locationServices: boolean;
+  radarDiscoverable: boolean;
   // Placeholder until the membership model exists — see plan §Data model.
   membershipStatus: 'FREE' | 'PREMIUM';
   padiPoints: number;
@@ -59,6 +60,7 @@ export type PublicProfileView = Omit<
   | 'invitePolicy'
   | 'pushNotifications'
   | 'locationServices'
+  | 'radarDiscoverable'
 >;
 
 interface ProfileStats {
@@ -117,6 +119,7 @@ function toOwnView(
     invitePolicy: profile.invitePolicy,
     pushNotifications: profile.pushNotifications,
     locationServices: profile.locationServices,
+    radarDiscoverable: profile.radarDiscoverable,
     membershipStatus: 'FREE',
     padiPoints: profile.padiPoints,
     ...stats,
@@ -198,6 +201,9 @@ export class ProfilesService {
         }),
         ...(dto.locationServices !== undefined && {
           locationServices: dto.locationServices,
+        }),
+        ...(dto.radarDiscoverable !== undefined && {
+          radarDiscoverable: dto.radarDiscoverable,
         }),
       },
     });

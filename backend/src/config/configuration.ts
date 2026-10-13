@@ -5,6 +5,16 @@ export const appConfig = registerAs('app', () => ({
   port: parseInt(process.env.PORT ?? '3000', 10),
   apiPrefix: process.env.API_PREFIX ?? 'api',
   corsOrigin: process.env.CORS_ORIGIN ?? '*',
+  // Public web app origin, used to build shareable links (e.g. SMS invites).
+  webUrl: process.env.APP_WEB_URL ?? 'http://localhost:3001',
+}));
+
+// Africa's Talking SMS (hangout phone invites). Optional at boot — SmsService
+// logs a warning and no-ops if the API key is unset.
+export const smsConfig = registerAs('sms', () => ({
+  apiKey: process.env.AFRICASTALKING_API_KEY || undefined,
+  username: process.env.AFRICASTALKING_USERNAME ?? 'sandbox',
+  senderId: process.env.AFRICASTALKING_SENDER_ID || undefined,
 }));
 
 export const databaseConfig = registerAs('database', () => ({

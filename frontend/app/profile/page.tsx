@@ -15,6 +15,7 @@ import { NightModeButton } from "@/features/theme/NightModeButton";
 import { RequireCountry } from "@/features/profile/require-country";
 import { DRINK_PREFERENCE_LABEL, OwnProfile } from "@/features/profile/types";
 import { profileName, useOwnProfile } from "@/features/profile/use-own-profile";
+import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 import { formatDayTime } from "@/lib/format/time";
 
 const REWARDS_GOAL = 10;
@@ -156,7 +157,7 @@ function PhotoHero({ name, age, photoUrl }: { name: string; age: number | null; 
   return (
     <div className="relative aspect-[345/338] w-full overflow-hidden rounded-[20px] bg-accent/35">
       {current ? (
-        <Image src={current} alt={name} fill sizes="430px" className="object-cover" unoptimized />
+        <Image src={cloudinaryDisplayUrl(current, { width: 860 })} alt={name} fill sizes="430px" className="object-cover" unoptimized />
       ) : (
         <span className="flex size-full items-center justify-center font-heading text-5xl font-bold text-heading/70">
           {initials(name)}

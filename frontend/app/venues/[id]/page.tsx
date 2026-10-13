@@ -23,7 +23,7 @@ import { VENUE_CATEGORY_EMOJI, VENUE_CATEGORY_LABEL, VenueDetail } from "@/featu
 import { ApiError } from "@/lib/api/client";
 import { formatPhone } from "@/lib/format/phone";
 
-const LeafletMap = dynamic(() => import("@/features/home/components/LeafletMap"), {
+const MapView = dynamic(() => import("@/features/home/components/GoogleMap"), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-[#eef3e9]" />,
 });
@@ -305,7 +305,7 @@ function VenueDetailContent() {
             {venue.description && <p className="font-body text-sm leading-6 text-heading">{venue.description}</p>}
             <section className="flex flex-col overflow-hidden rounded-2xl bg-card">
               <div className="relative isolate h-[175px] w-full">
-                <LeafletMap
+                <MapView
                   center={[venue.latitude, venue.longitude]}
                   pins={[{ id: venue.id, latitude: venue.latitude, longitude: venue.longitude, emoji: VENUE_CATEGORY_EMOJI[venue.category], label: venue.name }]}
                   selectedId={null}

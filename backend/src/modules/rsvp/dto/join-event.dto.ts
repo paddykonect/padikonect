@@ -7,4 +7,12 @@ export class JoinEventDto {
   @IsString()
   @MaxLength(280)
   message?: string;
+
+  @ApiPropertyOptional({
+    description: 'Share-link code, letting a guest join an invite-only hangout',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  inviteCode?: string;
 }

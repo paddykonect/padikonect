@@ -7,13 +7,13 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { distanceMeters } from "@/features/hangouts/places";
 import * as padisApi from "@/features/padis/api";
-import { PadiListItem } from "@/features/padis/types";
+import { PadiListItem, PadiUser } from "@/features/padis/types";
 import * as radarApi from "@/features/radar/api";
 import { RadarPadi } from "@/features/radar/api";
 import { PadiCarousel } from "./PadiCarousel";
-import type { MapPin } from "./LeafletMap";
+import type { MapPin } from "./GoogleMap";
 
-const LeafletMap = dynamic(() => import("./LeafletMap"), {
+const MapView = dynamic(() => import("./GoogleMap"), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-[#eef3e9]" />,
 });
@@ -42,6 +42,35 @@ interface PadisPanelProps {
   nav: ReactNode;
 }
 
+// A row in the "View the list" directory / "People near you" section.
+function PadiRow({ user, km, ratingAvg, ratingCount }: { user: PadiUser; km: number | null; ratingAvg: number | null; ratingCount: number }) {
+  return (
+    <li className="border-b border-border-subtle last:border-b-0">
+      <Link href={`/padi/${user.id}`} className="flex items-center gap-3 py-3">
+        <span className="relative shrink-0">
+          <Avatar name={user.displayName} photoUrl={user.photoUrl} size={44} />
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card ${user.online ? "bg-live" : "bg-border"}`}
+            aria-label={user.online ? "Online" : "Offline"}
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate font-body text-sm font-bold text-heading">{user.displayName}</span>
+            <span className="shrink-0 font-body text-xs text-body-text">
+              {km != null ? `${km.toFixed(1)}km` : user.online ? "Online" : "Offline"}
+              {ratingCount > 0 && ` · ★ ${ratingAvg?.toFixed(1)}`}
+            </span>
+          </span>
+          <span className="block truncate font-body text-xs text-body-text">
+            {user.wantsToBeInvitedFor ?? (user.online ? "Online now" : "Offline")}
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 // "Padis" side of Home's Hangouts/Padis toggle (PadiRadar). A map of padis
 // sharing nearby that expands full-screen; tapping a pin opens a swipeable
 // carousel of cards; "View the list" swaps to a filterable list. Sharing is
@@ -49,8 +78,10 @@ interface PadisPanelProps {
 export function PadisPanel({ accessToken, center, position, nav }: PadisPanelProps) {
   const [sharing, setSharing] = useState<boolean | null>(null);
   const [nearby, setNearby] = useState<RadarPadi[]>([]);
-  // The map/carousel show padis sharing a live location (nearby); the list
-  // shows all your padis, online or offline (allPadis).
+  // "People near you": discoverable sharers who aren't your padi yet.
+  const [discovered, setDiscovered] = useState<RadarPadi[]>([]);
+  // The map/carousel show padis sharing a live location (nearby) + discoverable
+  // people; the list shows all your padis, online or offline (allPadis).
   const [allPadis, setAllPadis] = useState<PadiListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listMode, setListMode] = useState(false);
@@ -75,6 +106,23 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
     const timer = setInterval(refresh, REFRESH_MS);
     return () => clearInterval(timer);
   }, [accessToken, refresh]);
+
+  // "People near you" needs the viewer's location. Reloads as it refreshes.
+  useEffect(() => {
+    if (!position) return;
+    let cancelled = false;
+    const load = () =>
+      radarApi
+        .discoverPeople(accessToken, position[0], position[1])
+        .then((d) => !cancelled && setDiscovered(d))
+        .catch(() => undefined);
+    load();
+    const timer = setInterval(load, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [accessToken, position]);
 
   // While sharing and on this screen, keep your location fresh.
   useEffect(() => {
@@ -108,11 +156,14 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
     }
   }
 
-  const patch = (id: string, change: Partial<RadarPadi>) =>
-    setNearby((list) => list.map((p) => (p.user.id === id ? { ...p, ...change } : p)));
+  const patch = (id: string, change: Partial<RadarPadi>) => {
+    const apply = (list: RadarPadi[]) => list.map((p) => (p.user.id === id ? { ...p, ...change } : p));
+    setNearby(apply);
+    setDiscovered(apply);
+  };
 
   async function toggleHide(id: string) {
-    const padi = nearby.find((p) => p.user.id === id);
+    const padi = nearby.find((p) => p.user.id === id) ?? discovered.find((p) => p.user.id === id);
     if (!padi) return;
     const next = !padi.hiddenFromThem;
     setActioningId(id);
@@ -157,15 +208,18 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
     });
   }
 
-  const filtered = useMemo(
-    () =>
-      nearby.filter(
-        (p) =>
-          (!filters.has("online") || p.user.online) &&
-          (!filters.has("walking") || !position || distanceMeters(position, [p.latitude, p.longitude]) <= WALKING_DISTANCE_METERS),
-      ),
-    [nearby, filters, position],
+  const matchesFilters = useCallback(
+    (p: RadarPadi) =>
+      (!filters.has("online") || p.user.online) &&
+      (!filters.has("walking") || !position || distanceMeters(position, [p.latitude, p.longitude]) <= WALKING_DISTANCE_METERS),
+    [filters, position],
   );
+
+  // Discoverable people only count while we know the viewer's location.
+  const visibleDiscovered = useMemo(() => (position ? discovered : []), [position, discovered]);
+  // The map + carousel show nearby padis and discoverable people together.
+  const filtered = useMemo(() => [...nearby, ...visibleDiscovered].filter(matchesFilters), [nearby, visibleDiscovered, matchesFilters]);
+  const discoveredFiltered = useMemo(() => visibleDiscovered.filter(matchesFilters), [visibleDiscovered, matchesFilters]);
 
   const pins: MapPin[] = useMemo(
     () =>
@@ -219,12 +273,12 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
 
   const mapEl = (
     <div className={`relative isolate w-full overflow-hidden bg-[#eef3e9] ${fullScreen ? "flex-1" : "h-[320px] rounded-[18px]"}`}>
-      <LeafletMap center={center} pins={pins} selectedId={selectedId} onSelect={(id) => id && setSelectedId(id)} resizeKey={resizeKey} />
+      <MapView center={center} pins={pins} selectedId={selectedId} onSelect={(id) => id && setSelectedId(id)} resizeKey={resizeKey} />
       <div className="pointer-events-none absolute inset-x-3 top-3 z-[500] flex items-start justify-between">
         <span className="flex items-center gap-[5px] rounded-full bg-white px-3 py-1.5 shadow-[0px_2px_4px_rgba(0,0,0,0.1)]">
           <span className="size-[7px] rounded-full bg-live" />
           <span className="font-body text-[11px] font-bold text-[#1b3b2b]">
-            {filtered.length === 0 ? "No padis sharing right now" : `${filtered.length} padi${filtered.length === 1 ? "" : "s"} nearby`}
+            {filtered.length === 0 ? "No one sharing nearby" : `${filtered.length} ${filtered.length === 1 ? "person" : "people"} nearby`}
           </span>
         </span>
         <button
@@ -302,10 +356,10 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
       {listMode ? (
         <>
           {filterPills}
-          {allFiltered.length === 0 ? (
+          {allFiltered.length === 0 && discoveredFiltered.length === 0 ? (
             <div className="flex w-full flex-col items-center gap-2 rounded-[18px] border border-dashed border-border px-6 py-10 text-center">
               <p className="font-heading text-lg font-bold text-heading">
-                {allPadis.length === 0 ? "No padis yet" : "No padis match these filters"}
+                {allPadis.length === 0 ? "No padis yet" : "Nothing matches these filters"}
               </p>
               <p className="font-body text-[13px] text-body-text">
                 {allPadis.length === 0
@@ -314,36 +368,30 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
               </p>
             </div>
           ) : (
-            <ul className="flex w-full flex-col rounded-[18px] bg-card px-4">
-              {allFiltered.map((p) => {
-                const d = kmOf(p.latitude, p.longitude);
-                return (
-                  <li key={p.user.id} className="border-b border-border-subtle last:border-b-0">
-                    <Link href={`/padi/${p.user.id}`} className="flex items-center gap-3 py-3">
-                      <span className="relative shrink-0">
-                        <Avatar name={p.user.displayName} photoUrl={p.user.photoUrl} size={44} />
-                        <span
-                          className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card ${p.user.online ? "bg-live" : "bg-border"}`}
-                          aria-label={p.user.online ? "Online" : "Offline"}
-                        />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="truncate font-body text-sm font-bold text-heading">{p.user.displayName}</span>
-                          <span className="shrink-0 font-body text-xs text-body-text">
-                            {d != null ? `${d.toFixed(1)}km` : p.user.online ? "Online" : "Offline"}
-                            {p.ratingCount > 0 && ` · ★ ${p.ratingAvg?.toFixed(1)}`}
-                          </span>
-                        </span>
-                        <span className="block truncate font-body text-xs text-body-text">
-                          {p.user.wantsToBeInvitedFor ?? (p.user.online ? "Online now" : "Offline")}
-                        </span>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {discoveredFiltered.length > 0 && (
+                <>
+                  <h3 className="font-body text-xs font-bold uppercase tracking-[0.4px] text-body-text">People near you</h3>
+                  <ul className="flex w-full flex-col rounded-[18px] bg-card px-4">
+                    {discoveredFiltered.map((p) => (
+                      <PadiRow key={p.user.id} user={p.user} km={kmOf(p.latitude, p.longitude)} ratingAvg={p.ratingAvg} ratingCount={p.ratingCount} />
+                    ))}
+                  </ul>
+                </>
+              )}
+              {allFiltered.length > 0 && (
+                <>
+                  {discoveredFiltered.length > 0 && (
+                    <h3 className="font-body text-xs font-bold uppercase tracking-[0.4px] text-body-text">Your padis</h3>
+                  )}
+                  <ul className="flex w-full flex-col rounded-[18px] bg-card px-4">
+                    {allFiltered.map((p) => (
+                      <PadiRow key={p.user.id} user={p.user} km={kmOf(p.latitude, p.longitude)} ratingAvg={p.ratingAvg} ratingCount={p.ratingCount} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           )}
           <div className="flex justify-center pt-1">
             <button
@@ -359,7 +407,7 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
       ) : (
         <section className="flex w-full flex-col gap-2.5">
           {mapEl}
-          <p className="text-center font-body text-[12.5px] text-body-text">Tap a padi to see their details</p>
+          <p className="text-center font-body text-[12.5px] text-body-text">Tap someone to see their details</p>
         </section>
       )}
 

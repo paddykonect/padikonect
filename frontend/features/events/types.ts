@@ -6,6 +6,8 @@ export interface EventListItem {
   id: string;
   title: string;
   coverImageUrl: string | null;
+  /** Activity emoji chosen in the wizard's "Create activity" step. */
+  emoji: string | null;
   addressText: string;
   latitude: number;
   longitude: number;
@@ -25,6 +27,15 @@ export interface EventListItem {
   padiCount: number;
   /** Whether the viewer has saved this hangout (the card's heart). */
   isFavorite: boolean;
+}
+
+export type MediaType = "IMAGE" | "VIDEO";
+
+export interface EventMedia {
+  url: string;
+  type: MediaType;
+  width: number | null;
+  height: number | null;
 }
 
 export interface EventPerson {
@@ -49,6 +60,19 @@ export interface EventVenue {
 
 export interface EventDetail extends EventListItem {
   description: string | null;
+  /** Host's "Introduce yourself" message; separate from description. */
+  hostIntro: string | null;
+  language: string | null;
+  startingGroupSize: number;
+  minJoiners: number | null;
+  /** Preferred joiner age range (the "Age" slider); informational. */
+  minAge: number | null;
+  maxAge: number | null;
+  /** Membership gate: min padi points to join (null = open). */
+  minPadiPoints: number | null;
+  media: EventMedia[];
+  /** Share-link code; only present for the host. */
+  inviteCode: string | null;
   privacy: EventPrivacy;
   cancelReason: string | null;
   isHost: boolean;
@@ -61,6 +85,14 @@ export interface EventDetail extends EventListItem {
   venueNote: string | null;
 }
 
+export interface EventMediaInput {
+  url: string;
+  publicId: string;
+  type?: MediaType;
+  width?: number;
+  height?: number;
+}
+
 export interface EventInput {
   title: string;
   description?: string;
@@ -69,10 +101,21 @@ export interface EventInput {
   longitude?: number;
   venueId?: string;
   startAt: string;
+  endAt?: string;
   capacity: number;
   coverImageUrl?: string;
   drinkCategory?: DrinkCategory;
   privacy?: EventPrivacy;
+  tags?: string[];
+  emoji?: string;
+  hostIntro?: string;
+  startingGroupSize?: number;
+  minJoiners?: number;
+  minAge?: number;
+  maxAge?: number;
+  language?: string;
+  minPadiPoints?: number;
+  media?: EventMediaInput[];
 }
 
 export interface InviteCandidate {

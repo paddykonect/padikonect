@@ -39,9 +39,17 @@ export function getEvent(accessToken: string, id: string) {
   return apiRequest<EventDetail>(`/events/${id}`, { method: "GET", accessToken });
 }
 
+/** Resolve a share link to the hangout it points at. */
+export function getEventByInvite(accessToken: string, code: string) {
+  return apiRequest<EventDetail>(`/events/invite/${code}`, { method: "GET", accessToken });
+}
+
 /** Ask to join; the host approves (or it lands on the waitlist when full). */
-export function joinEvent(accessToken: string, id: string, message?: string) {
-  return apiRequest<{ status: RsvpStatus }>(`/events/${id}/rsvps`, { body: message ? { message } : {}, accessToken });
+export function joinEvent(accessToken: string, id: string, message?: string, inviteCode?: string) {
+  return apiRequest<{ status: RsvpStatus }>(`/events/${id}/rsvps`, {
+    body: { ...(message && { message }), ...(inviteCode && { inviteCode }) },
+    accessToken,
+  });
 }
 
 export function leaveEvent(accessToken: string, id: string) {
@@ -81,6 +89,20 @@ export function listInviteCandidates(accessToken: string, id: string) {
 
 export function invitePadis(accessToken: string, id: string, userIds: string[]) {
   return apiRequest<{ invited: number }>(`/events/${id}/invites`, { body: { userIds }, accessToken });
+}
+
+/** The host's share link (app-relative path + the raw code). */
+export function getInviteLink(accessToken: string, id: string) {
+  return apiRequest<{ code: string; path: string }>(`/events/${id}/invite-link`, { method: "GET", accessToken });
+}
+
+export function listPhoneInvites(accessToken: string, id: string) {
+  return apiRequest<string[]>(`/events/${id}/phone-invites`, { method: "GET", accessToken });
+}
+
+/** Add numbers to the phone-invite list (SMS send is manual — share the link). */
+export function setPhoneInvites(accessToken: string, id: string, phones: string[]) {
+  return apiRequest<{ phones: string[] }>(`/events/${id}/phone-invites`, { body: { phones }, accessToken });
 }
 
 export function listJoinRequests(accessToken: string, id: string) {

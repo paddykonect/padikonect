@@ -159,6 +159,9 @@ model Profile {
   invitePolicy      InvitePolicy    @default(EVERYONE)
   pushNotifications Boolean         @default(true)
   locationServices  Boolean         @default(true)
+  // Radar "People near you": when on (and sharing location), padis-to-be who
+  // aren't your padi yet can discover you nearby. Off by default.
+  radarDiscoverable Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
@@ -294,10 +297,29 @@ model Event {
   location           Unsupported("geometry(Point, 4326)")?
   startAt            DateTime
   endAt              DateTime?
+  // capacity = maximum joiners. startingGroupSize is the host's initial group
+  // (default: just the host); minJoiners is informational ("needs N to happen").
   capacity           Int
+  startingGroupSize  Int                                   @default(1)
+  minJoiners         Int?
+  // Preferred joiner age range (the "Age" slider), informational like minJoiners.
+  minAge             Int?
+  maxAge             Int?
   priceKobo          Int?
   coverImageUrl      String?
   coverImagePublicId String?
+  // Activity "Customize" emoji (also used for the map pin/card).
+  emoji              String?
+  // Host's "Introduce yourself" message, separate from the activity description.
+  hostIntro          String?                               @db.VarChar(2000)
+  language           String?
+  // Membership gate: when set, only users with at least this many padiPoints
+  // may join (null = open to everyone).
+  minPadiPoints      Int?
+  // Share-link token: /hangouts/:id?invite=<code> lets invitees into an
+  // invite-only hangout. Nullable so existing rows migrate cleanly; new events
+  // get one via @default, and the invite-link endpoint backfills if missing.
+  inviteCode         String?                               @unique @default(cuid())
   // Defaulted to APPROVAL for every host regardless of track record — the PRD
   // leaves the auto-approve-vs-approval default an open product question (see
   // plan §Open questions); APPROVAL is the safer choice until that's resolved.
@@ -326,6 +348,8 @@ model Event {
   conversation Conversation?
   padiRatings  PadiRating[]
   favorites    EventFavorite[]
+  media        EventMedia[]
+  phoneInvites EventPhoneInvite[]
 
   @@index([hostId])
   @@index([venueId])
@@ -514,6 +538,35 @@ model EventFavorite {
 
   @@id([userId, eventId])
   @@index([userId, createdAt])
+}
+
+// Hangout photo gallery (the "Personalize" step). Mirrors PostMedia; the
+// position-0 item is mirrored into Event.coverImageUrl for list/map/card use.
+model EventMedia {
+  id         String    @id @default(uuid())
+  eventId    String
+  event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  url        String
+  publicId   String
+  type       MediaType @default(IMAGE)
+  width      Int?
+  height     Int?
+  position   Int       @default(0)
+
+  @@index([eventId])
+}
+
+// People invited by phone from the "Invite padis" step. SMS delivery is not
+// wired up yet — the host shares the invite link manually for now.
+model EventPhoneInvite {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  phone     String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, phone])
+  @@index([eventId])
 }
 
 // One-directional, like "following": userId added padiId (e.g. via Scan padi).

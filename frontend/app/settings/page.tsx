@@ -158,6 +158,18 @@ function SettingsContent() {
             />
           }
         />
+        <SettingsRow
+          label="Discoverable on radar"
+          hint="Let padis-to-be find you in “People near you” while you share"
+          control={
+            <Switch
+              label="Discoverable on radar"
+              checked={profile?.radarDiscoverable ?? false}
+              disabled={!profile}
+              onChange={(v) => void save({ radarDiscoverable: v })}
+            />
+          }
+        />
       </SettingsGroup>
 
       <SettingsGroup title="Privacy & safety">

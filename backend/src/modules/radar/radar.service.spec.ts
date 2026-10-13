@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/unbound-method -- jest.fn() mocks on plain
    object literals, not real bound class methods; the rule can't tell */
 import { PrismaService } from '../../database/prisma.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { RadarService } from './radar.service';
 
 interface MakeOpts {
   nearby?: ReturnType<typeof liveRow>[];
   added?: string[];
   hid?: string[];
+  blocked?: string[];
   ratings?: Array<{
     rateeId: string;
     _avg: { stars: number | null };
@@ -59,7 +61,10 @@ function make(opts: MakeOpts = {}) {
     },
     padiRating: { groupBy: jest.fn().mockResolvedValue(opts.ratings ?? []) },
   } as unknown as PrismaService;
-  return { service: new RadarService(prisma), prisma };
+  const blocks = {
+    hiddenUserIds: jest.fn().mockResolvedValue(opts.blocked ?? []),
+  } as unknown as BlocksService;
+  return { service: new RadarService(prisma, blocks), prisma, blocks };
 }
 
 describe('RadarService', () => {
@@ -138,5 +143,39 @@ describe('RadarService', () => {
     expect(prisma.liveLocation.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'me' },
     });
+  });
+
+  it('discover filters by bounding box + discoverable + unconnected + unblocked', async () => {
+    const { service, prisma } = make({ blocked: ['blockedUser'] });
+    await service.discover('me', 6.43, 3.42);
+    const [[args]] = (prisma.liveLocation.findMany as jest.Mock).mock.calls as [
+      [{ where: Record<string, Record<string, unknown>> }],
+    ];
+    const where = args.where;
+    expect(where.userId).toEqual({ notIn: ['me', 'blockedUser'] });
+    expect(where.latitude).toMatchObject({ gte: expect.any(Number) as number });
+    expect(where.longitude).toMatchObject({
+      gte: expect.any(Number) as number,
+    });
+    expect(where.user).toMatchObject({
+      profile: { radarDiscoverable: true },
+      padiConnections: { none: { padiId: 'me' } },
+      padiOf: { none: { userId: 'me' } },
+      radarHidesMade: { none: { hiddenFromId: 'me' } },
+    });
+  });
+
+  it('discover returns unconnected people with isPadi false and online/rating', async () => {
+    const { service } = make({
+      nearby: [liveRow('stranger', { wants: 'brunch' })],
+      ratings: [
+        { rateeId: 'stranger', _avg: { stars: 5 }, _count: { _all: 1 } },
+      ],
+    });
+    const [p] = await service.discover('me', 6.43, 3.42);
+    expect(p.user.online).toBe(true);
+    expect(p.user.wantsToBeInvitedFor).toBe('brunch');
+    expect(p.isPadi).toBe(false);
+    expect(p.ratingAvg).toBe(5);
   });
 });

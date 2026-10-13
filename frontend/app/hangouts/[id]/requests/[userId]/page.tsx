@@ -9,12 +9,10 @@ import { RequireAuth } from "@/features/auth/require-auth";
 import * as eventsApi from "@/features/events/api";
 import { EventDetail, JoinRequestDetail } from "@/features/events/types";
 import { Card, CardLabel, FlowScreen, ScreenMessage } from "@/features/hangouts/components/FlowScreen";
-import { CalendarIcon, ClockIcon, PeopleIcon, PinIcon } from "@/features/hangouts/components/icons";
+import { ClockIcon } from "@/features/hangouts/components/icons";
 import { RequireCountry } from "@/features/profile/require-country";
 import { ApiError } from "@/lib/api/client";
-import { formatDateTime } from "@/lib/format/time";
-
-const NOTE_MAX = 150;
+import { formatDayTime } from "@/lib/format/time";
 
 /** "2 hours ago", "5 mins ago" */
 function ago(iso: string) {
@@ -34,7 +32,6 @@ function RequestDetailContent() {
   const { accessToken } = useAuth();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [request, setRequest] = useState<JoinRequestDetail | null>(null);
-  const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [requestedAgo, setRequestedAgo] = useState("");
@@ -55,7 +52,7 @@ function RequestDetailContent() {
     setBusy(decision);
     setError(null);
     try {
-      await eventsApi.decideJoinRequest(accessToken, id, userId, decision, note);
+      await eventsApi.decideJoinRequest(accessToken, id, userId, decision);
       router.replace(`/hangouts/${id}/requests`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -71,8 +68,8 @@ function RequestDetailContent() {
   const meta = [
     `${request.user.mutualHangouts} mutual hangout${request.user.mutualHangouts === 1 ? "" : "s"}`,
     request.user.state,
-    `Member since ${new Date(request.user.memberSince).getFullYear()}`,
   ].filter(Boolean);
+  const venueLine = event.venue ? `${event.venue.name}, ${event.addressText}` : event.addressText;
 
   return (
     <FlowScreen
@@ -80,14 +77,14 @@ function RequestDetailContent() {
       backHref={`/hangouts/${id}/requests`}
       footer={
         pending ? (
-          <>
-            <Button loading={busy === "approve"} disabled={busy !== null} onClick={() => void decide("approve")}>
-              Accept Request
-            </Button>
-            <Button variant="text" loading={busy === "decline"} disabled={busy !== null} onClick={() => void decide("decline")}>
+          <div className="flex gap-3">
+            <Button variant="text" className="flex-1 border border-border" loading={busy === "decline"} disabled={busy !== null} onClick={() => void decide("decline")}>
               Decline
             </Button>
-          </>
+            <Button className="flex-1" loading={busy === "approve"} disabled={busy !== null} onClick={() => void decide("approve")}>
+              Accept
+            </Button>
+          </div>
         ) : undefined
       }
     >
@@ -97,23 +94,12 @@ function RequestDetailContent() {
         <p className="font-body text-[13px] text-body-text">{meta.join(" · ")}</p>
       </div>
 
-      <Card className="gap-3">
+      <Card className="gap-1.5">
         <CardLabel>Wants to join</CardLabel>
         <h3 className="font-body text-base font-bold text-heading">{event.title}</h3>
-        <div className="flex flex-col gap-2 border-t border-divider pt-3 font-body text-sm text-heading">
-          <p className="flex items-center gap-2.5">
-            <CalendarIcon size={18} className="shrink-0" />
-            {formatDateTime(event.startAt)}
-          </p>
-          <p className="flex items-center gap-2.5">
-            <PinIcon size={18} className="shrink-0" />
-            {event.addressText}
-          </p>
-          <p className="flex items-center gap-2.5">
-            <PeopleIcon size={18} className="shrink-0" />
-            {event.capacity} padis capacity ({event.attendeeCount} joined)
-          </p>
-        </div>
+        <p className="font-body text-sm text-body-text">
+          {formatDayTime(event.startAt)} · {venueLine}
+        </p>
       </Card>
 
       {request.message && (
@@ -128,25 +114,7 @@ function RequestDetailContent() {
         Requested {requestedAgo}
       </p>
 
-      {pending ? (
-        <label className="flex flex-col gap-2">
-          <span className="flex justify-between font-body text-sm">
-            <span className="font-medium text-heading">Add a note (optional)</span>
-            <span className="text-body-text">
-              {note.length}/{NOTE_MAX}
-            </span>
-          </span>
-          <textarea
-            value={note}
-            maxLength={NOTE_MAX}
-            rows={4}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder={`e.g. See you there, ${firstName}!`}
-            className="resize-none rounded-field border border-border bg-card px-4 py-3 font-body text-[15px] leading-[22px] text-input-text outline-none placeholder:text-body-text"
-          />
-          <span className="font-body text-xs text-body-text">This note will be sent directly to {firstName} with the decision.</span>
-        </label>
-      ) : (
+      {!pending && (
         <p className="text-center font-body text-sm text-body-text">
           {request.status === "DECLINED" ? "You declined this request." : request.status === "CANCELLED" ? `${firstName} cancelled this request.` : `${firstName} is going.`}
         </p>

@@ -37,6 +37,16 @@ function baseEventRow(overrides: Partial<Record<string, unknown>> = {}) {
     status: 'PUBLISHED',
     cancelledAt: null,
     cancelReason: null,
+    emoji: null,
+    hostIntro: null,
+    startingGroupSize: 1,
+    minJoiners: null,
+    minAge: null,
+    maxAge: null,
+    language: null,
+    minPadiPoints: null,
+    inviteCode: 'invite-code-1',
+    media: [],
     createdAt: new Date(),
     updatedAt: new Date(),
     host: { id: 'host-1', profile: { displayName: 'Host', photoUrl: null } },
@@ -46,11 +56,23 @@ function baseEventRow(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 function makeService() {
+  const tx = {
+    event: {
+      create: jest.fn().mockResolvedValue(baseEventRow()),
+      update: jest.fn().mockResolvedValue(baseEventRow()),
+    },
+    eventMedia: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    conversation: { create: jest.fn().mockResolvedValue({ id: 'conv-1' }) },
+    conversationParticipant: { create: jest.fn() },
+  };
   const prisma = {
     event: {
       create: jest.fn(),
       update: jest.fn(),
-      findUnique: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue(baseEventRow()),
       findUniqueOrThrow: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -61,16 +83,7 @@ function makeService() {
     },
     padiConnection: { findMany: jest.fn().mockResolvedValue([]) },
     eventFavorite: { findMany: jest.fn().mockResolvedValue([]) },
-    $transaction: jest.fn((cb: (tx: unknown) => unknown) =>
-      cb({
-        event: {
-          create: jest.fn().mockResolvedValue(baseEventRow()),
-          update: jest.fn(),
-        },
-        conversation: { create: jest.fn().mockResolvedValue({ id: 'conv-1' }) },
-        conversationParticipant: { create: jest.fn() },
-      }),
-    ),
+    $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
   } as unknown as PrismaService;
   const geo = {
     syncEventLocation: jest.fn(),
@@ -94,6 +107,7 @@ function makeService() {
     geo,
     googleMaps,
     notifications,
+    tx,
   };
 }
 
@@ -158,6 +172,67 @@ describe('EventsService', () => {
         longitude: 3.4,
       });
       expect(googleMaps.geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it('persists the wizard fields and media (first photo becomes the cover)', async () => {
+      const { service, tx } = makeService();
+      await service.create('host-1', {
+        title: 'Game night',
+        addressText: 'Lekki',
+        startAt: new Date(Date.now() + 3600_000).toISOString(),
+        capacity: 10,
+        latitude: 6.4,
+        longitude: 3.4,
+        emoji: '🎲',
+        hostIntro: 'Come hang!',
+        startingGroupSize: 2,
+        minJoiners: 3,
+        language: 'English',
+        minPadiPoints: 50,
+        media: [
+          { url: 'https://cdn/a.jpg', publicId: 'a' },
+          { url: 'https://cdn/b.jpg', publicId: 'b' },
+        ],
+      });
+
+      expect(tx.event.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- nested expect.objectContaining is typed as any
+          data: expect.objectContaining({
+            emoji: '🎲',
+            hostIntro: 'Come hang!',
+            startingGroupSize: 2,
+            minJoiners: 3,
+            language: 'English',
+            minPadiPoints: 50,
+            coverImageUrl: 'https://cdn/a.jpg',
+            coverImagePublicId: 'a',
+          }),
+        }),
+      );
+      expect(tx.eventMedia.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            expect.objectContaining({ url: 'https://cdn/a.jpg', position: 0 }),
+            expect.objectContaining({ url: 'https://cdn/b.jpg', position: 1 }),
+          ],
+        }),
+      );
+    });
+
+    it('rejects a group size larger than the capacity', async () => {
+      const { service } = makeService();
+      await expect(
+        service.create('host-1', {
+          title: 'x',
+          addressText: 'y',
+          startAt: new Date(Date.now() + 3600_000).toISOString(),
+          capacity: 5,
+          latitude: 1,
+          longitude: 1,
+          minJoiners: 8,
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_GROUP_SIZE' });
     });
   });
 
@@ -276,6 +351,37 @@ describe('EventsService', () => {
       const detail = await service.getById('event-1', 'someone-else');
       expect(detail).toMatchObject({ isHost: false, pendingRequestCount: 0 });
       expect(prisma.rsvp.count).not.toHaveBeenCalled();
+    });
+
+    it('returns the wizard fields and media, with the invite code host-only', async () => {
+      const { service, prisma } = makeService();
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(
+        baseEventRow({
+          hostIntro: 'Come hang!',
+          language: 'English',
+          startingGroupSize: 2,
+          minJoiners: 3,
+          minPadiPoints: 50,
+          inviteCode: 'invite-code-1',
+          media: [
+            { url: 'https://cdn/a.jpg', type: 'IMAGE', width: 100, height: 80 },
+          ],
+        }),
+      );
+
+      const asHost = await service.getById('event-1', 'host-1');
+      expect(asHost).toMatchObject({
+        hostIntro: 'Come hang!',
+        language: 'English',
+        startingGroupSize: 2,
+        minJoiners: 3,
+        minPadiPoints: 50,
+        inviteCode: 'invite-code-1',
+        media: [expect.objectContaining({ url: 'https://cdn/a.jpg' })],
+      });
+
+      const asGuest = await service.getById('event-1', 'someone-else');
+      expect(asGuest.inviteCode).toBeNull();
     });
   });
 

@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppException } from '../../common/exceptions/app.exception';
 import { PrismaService } from '../../database/prisma.service';
+import { SmsService } from '../../integrations/sms/sms.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { VenueResponseDto } from './dto/venue-response.dto';
 import { countMutualHangouts } from './mutual-hangouts';
@@ -34,6 +37,12 @@ export interface InviteCandidateView {
   joined: boolean;
 }
 
+export interface InviteLinkView {
+  code: string;
+  /** App-relative link; the client prepends its own origin. */
+  path: string;
+}
+
 /**
  * Host-a-hangout extras on top of EventsService: the venue confirmation
  * round-trip and the "Invite padis" picker.
@@ -43,6 +52,8 @@ export class HostingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly sms: SmsService,
+    private readonly config: ConfigService,
   ) {}
 
   private async getEvent(eventId: string) {
@@ -222,6 +233,65 @@ export class HostingService {
         joined: joined.has(p.padiId),
       }))
       .sort((a, b) => b.mutualHangouts - a.mutualHangouts);
+  }
+
+  /**
+   * The share link for a hangout. inviteCode is set by default on create, but
+   * rows that predate the wizard may be null — backfill one on first request.
+   */
+  async getInviteLink(eventId: string): Promise<InviteLinkView> {
+    const event = await this.getEvent(eventId);
+    let code = event.inviteCode;
+    if (!code) {
+      code = randomUUID();
+      await this.prisma.event.update({
+        where: { id: eventId },
+        data: { inviteCode: code },
+      });
+    }
+    return { code, path: `/hangouts/${eventId}?invite=${code}` };
+  }
+
+  /** The numbers invited by phone. */
+  async listPhoneInvites(eventId: string): Promise<string[]> {
+    const rows = await this.prisma.eventPhoneInvite.findMany({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+      select: { phone: true },
+    });
+    return rows.map((r) => r.phone);
+  }
+
+  /**
+   * Add phone numbers to the invite list (additive; duplicates ignored) and
+   * text the share link to the newly-added ones via Africa's Talking. The SMS
+   * is best-effort — a texting failure never fails the request.
+   */
+  async setPhoneInvites(
+    eventId: string,
+    phones: string[],
+  ): Promise<{ phones: string[] }> {
+    const event = await this.getEvent(eventId);
+    const incoming = Array.from(new Set(phones.map((p) => p.trim())));
+    const existing = await this.listPhoneInvites(eventId);
+    const existingSet = new Set(existing);
+    const fresh = incoming.filter((p) => !existingSet.has(p));
+
+    if (fresh.length > 0) {
+      await this.prisma.eventPhoneInvite.createMany({
+        data: fresh.map((phone) => ({ eventId, phone })),
+        skipDuplicates: true,
+      });
+      // Text each new number the invite link (best-effort).
+      const { path } = await this.getInviteLink(eventId);
+      const webUrl = this.config.get<string>('app.webUrl') ?? '';
+      const url = `${webUrl}${path}`;
+      await this.sms.send(
+        fresh,
+        `You're invited to "${event.title}" on Paddykonect 🎉 Tap to join: ${url}`,
+      );
+    }
+    return { phones: await this.listPhoneInvites(eventId) };
   }
 
   async invite(
