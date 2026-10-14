@@ -17,7 +17,7 @@ export function QrScanner({ onResult, fallbackLabel = "a padi code" }: QrScanner
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onResultRef = useRef(onResult);
-  const [state, setState] = useState<"starting" | "scanning" | "blocked" | "unsupported">("starting");
+  const [state, setState] = useState<"starting" | "scanning" | "blocked" | "unsupported" | "insecure">("starting");
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -29,6 +29,13 @@ export function QrScanner({ onResult, fallbackLabel = "a padi code" }: QrScanner
     let stopped = false;
 
     async function start() {
+      // The camera API only exists in a secure context (HTTPS or localhost).
+      // Opening the app by LAN IP over http:// disables it — flag that clearly
+      // instead of blaming the browser.
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        setState("insecure");
+        return;
+      }
       if (!navigator.mediaDevices?.getUserMedia) {
         setState("unsupported");
         return;
@@ -85,6 +92,7 @@ export function QrScanner({ onResult, fallbackLabel = "a padi code" }: QrScanner
         <div className="flex flex-col items-center gap-3 px-8 text-center">
           <Image src="/icons/scan/camera.svg" alt="" width={40} height={40} />
           {state === "blocked" && <p className="font-body text-[13px] text-white/80">Camera access is blocked. Allow it in your browser settings, or enter {fallbackLabel} below.</p>}
+          {state === "insecure" && <p className="font-body text-[13px] text-white/80">The camera needs a secure page. Open the app at <b>http://localhost:3001</b> (same computer), or over HTTPS, or enter {fallbackLabel} below.</p>}
           {state === "unsupported" && <p className="font-body text-[13px] text-white/80">This browser can&apos;t use the camera. Enter {fallbackLabel} below instead.</p>}
         </div>
       )}

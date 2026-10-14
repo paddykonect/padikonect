@@ -1,4 +1,9 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+// Same-origin by default: calls go to the frontend's own origin and Next
+// reverse-proxies /api/v1/* to the backend (see next.config.ts). This keeps the
+// refresh cookie first-party so the session survives a reload on any host
+// (localhost, LAN IP, prod domain). Override with NEXT_PUBLIC_API_BASE only for
+// a genuinely cross-origin setup.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
 export class ApiError extends Error {
   constructor(
