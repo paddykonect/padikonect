@@ -38,7 +38,14 @@ async function bootstrap() {
       next: Parameters<typeof requestIdMiddleware.use>[2],
     ) => requestIdMiddleware.use(req, res, next),
   );
-  app.use(helmet());
+  // Helmet's default COOP value is 'same-origin', which blocks Google Identity
+  // Services from posting the credential back from its popup window. Override
+  // to 'same-origin-allow-popups' so GSI ux_mode:'popup' works correctly.
+  app.use(
+    helmet({
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    }),
+  );
   app.use(compression());
   app.use(cookieParser());
 

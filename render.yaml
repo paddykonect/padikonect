@@ -108,3 +108,13 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # Public web URL for shareable links (SMS invites). Set to your Vercel/Render frontend URL.
+      - key: APP_WEB_URL
+        sync: false
+      # Africa's Talking SMS invites (optional).
+      - key: AFRICASTALKING_API_KEY
+        sync: false
+      - key: AFRICASTALKING_USERNAME
+        value: sandbox
+      - key: AFRICASTALKING_SENDER_ID
+        sync: false
