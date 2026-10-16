@@ -19,6 +19,12 @@ services:
     startCommand: npm run start -- -p $PORT
     autoDeploy: true
     envVars:
+      # Reverse-proxy target for /api/v1/* (next.config.ts). Baked at BUILD time
+      # into the routes manifest, so a redeploy (rebuild) is required to change
+      # it. Without this it defaults to http://localhost:3000 and every API call
+      # 500s with ECONNREFUSED in production.
+      - key: BACKEND_ORIGIN
+        value: https://padikonect-api.onrender.com
       # Build-time public vars. Point at the backend service below.
       - key: NEXT_PUBLIC_API_URL
         value: https://padikonect-api.onrender.com/api/v1
