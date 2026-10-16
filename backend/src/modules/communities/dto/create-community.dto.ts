@@ -1,8 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   MaxLength,
   Min,
@@ -49,4 +52,33 @@ export class CreateCommunityDto {
   @Min(18)
   @Max(99)
   maxAge?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  coverImageUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  coverImagePublicId?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'VIBE chips (max 8)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  vibe?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Community RULES (max 10)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(140, { each: true })
+  rules?: string[];
 }

@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { AppException } from '../../common/exceptions/app.exception';
@@ -15,12 +16,17 @@ export interface GoogleIdentity {
 export class GoogleAuthService {
   private readonly clientId?: string;
   private readonly client = new OAuth2Client();
+  private readonly logger = new Logger('GoogleAuth');
 
   constructor(config: ConfigService) {
     this.clientId = config.get<string>('googleAuth.clientId');
   }
 
   async verify(idToken: string): Promise<GoogleIdentity> {
+    // DEBUG(google-500): remove once the Google sign-in 500 is diagnosed.
+    this.logger.log(
+      `verify: clientId=${this.clientId ?? '<unset>'} tokenLength=${idToken?.length ?? 0}`,
+    );
     if (!this.clientId) {
       throw new AppException(
         'GOOGLE_SIGN_IN_DISABLED',
@@ -36,7 +42,14 @@ export class GoogleAuthService {
         audience: this.clientId,
       });
       payload = ticket.getPayload();
-    } catch {
+      this.logger.log(
+        `verify ok: aud=${String(payload?.aud)} iss=${payload?.iss} email=${payload?.email} email_verified=${payload?.email_verified}`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `verifyIdToken failed: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       payload = undefined;
     }
 

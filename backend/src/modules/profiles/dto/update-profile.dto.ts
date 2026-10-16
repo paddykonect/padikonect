@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DrinkPreference, InvitePolicy } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -9,7 +10,19 @@ import {
   IsString,
   Matches,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+
+export class ProfilePhotoDto {
+  @ApiPropertyOptional()
+  @IsString()
+  url!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+}
 
 export class UpdateProfileDto {
   @ApiPropertyOptional()
@@ -39,6 +52,44 @@ export class UpdateProfileDto {
   @IsString({ each: true })
   @MaxLength(30, { each: true })
   interests?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: '"Your vibe" chips (Easygoing, Coffee person, …)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(30, { each: true })
+  vibe?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Invitation preferences: selected plan categories (empty = Anything)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  invitePlans?: string[];
+
+  @ApiPropertyOptional({
+    type: [ProfilePhotoDto],
+    description: 'Profile photo gallery (max 12); the first is the cover/avatar',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => ProfilePhotoDto)
+  photos?: ProfilePhotoDto[];
+
+  @ApiPropertyOptional({ description: 'Edit profile > Show age on your profile' })
+  @IsOptional()
+  @IsBoolean()
+  showAge?: boolean;
 
   @ApiPropertyOptional({
     description: 'Profile card "Wants to be invited for" free-text hint',

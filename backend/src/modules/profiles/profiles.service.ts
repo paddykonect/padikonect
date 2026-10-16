@@ -8,22 +8,38 @@ import { isHiddenFrom } from '../radar/radar-hide';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const AVATAR_FOLDER = 'avatars';
+const PHOTO_FOLDER = 'profile-photos';
 
 const userInclude = {
   user: {
     select: { fullName: true, email: true, phone: true, dateOfBirth: true },
   },
+  photos: { orderBy: { position: 'asc' } },
 } satisfies Prisma.ProfileInclude;
+
+export interface ProfilePhotoView {
+  url: string;
+  publicId: string | null;
+  position: number;
+}
 
 export interface OwnProfileView {
   id: string;
   displayName: string | null;
   photoUrl: string | null;
+  // Profile photo gallery ("Profile fotos"); ordered, position 0 = cover.
+  photos: ProfilePhotoView[];
   bio: string | null;
   // Derived from the account's date of birth; null if unknown.
   age: number | null;
+  // Edit profile > "Show age on your profile".
+  showAge: boolean;
   drinkPreference: Profile['drinkPreference'];
   interests: string[];
+  // "Your vibe" chips.
+  vibe: string[];
+  // Invitation preferences: selected plan categories (empty = Anything).
+  invitePlans: string[];
   // Profile card "Wants to be invited for" free-text hint.
   wantsToBeInvitedFor: string | null;
   country: string | null;
@@ -61,6 +77,8 @@ export type PublicProfileView = Omit<
   | 'pushNotifications'
   | 'locationServices'
   | 'radarDiscoverable'
+  | 'showAge'
+  | 'invitePlans'
 >;
 
 interface ProfileStats {
@@ -76,6 +94,7 @@ type ProfileWithUser = Profile & {
     phone: string | null;
     dateOfBirth: Date | null;
   };
+  photos: { url: string; publicId: string | null; position: number }[];
 };
 
 function avatarPublicId(userId: string): string {
@@ -105,10 +124,18 @@ function toOwnView(
     id: profile.userId,
     displayName: profile.displayName,
     photoUrl: profile.photoUrl,
+    photos: profile.photos.map((p) => ({
+      url: p.url,
+      publicId: p.publicId,
+      position: p.position,
+    })),
     bio: profile.bio,
     age: ageFrom(profile.user.dateOfBirth),
+    showAge: profile.showAge,
     drinkPreference: profile.drinkPreference,
     interests: profile.interests,
+    vibe: profile.vibe,
+    invitePlans: profile.invitePlans,
     wantsToBeInvitedFor: profile.wantsToBeInvitedFor,
     country: profile.country,
     nationality: profile.nationality,
@@ -173,9 +200,35 @@ export class ProfilesService {
     userId: string,
     dto: UpdateProfileDto,
   ): Promise<OwnProfileView> {
-    await this.findOrCreate(userId);
+    const { id: profileId } = await this.findOrCreate(userId);
     if (dto.phone !== undefined) {
       await this.updatePhone(userId, dto.phone);
+    }
+    // Replace the photo gallery when provided; position 0 mirrors photoUrl.
+    if (dto.photos !== undefined) {
+      const cover = dto.photos[0];
+      await this.prisma.$transaction([
+        this.prisma.profilePhoto.deleteMany({ where: { profileId } }),
+        ...(dto.photos.length
+          ? [
+              this.prisma.profilePhoto.createMany({
+                data: dto.photos.map((p, i) => ({
+                  profileId,
+                  url: p.url,
+                  publicId: p.publicId ?? null,
+                  position: i,
+                })),
+              }),
+            ]
+          : []),
+        this.prisma.profile.update({
+          where: { userId },
+          data: {
+            photoUrl: cover?.url ?? null,
+            photoPublicId: cover?.publicId ?? null,
+          },
+        }),
+      ]);
     }
     const profile = await this.prisma.profile.update({
       where: { userId },
@@ -187,6 +240,9 @@ export class ProfilesService {
           drinkPreference: dto.drinkPreference,
         }),
         ...(dto.interests !== undefined && { interests: dto.interests }),
+        ...(dto.vibe !== undefined && { vibe: dto.vibe }),
+        ...(dto.invitePlans !== undefined && { invitePlans: dto.invitePlans }),
+        ...(dto.showAge !== undefined && { showAge: dto.showAge }),
         ...(dto.wantsToBeInvitedFor !== undefined && {
           wantsToBeInvitedFor: dto.wantsToBeInvitedFor,
         }),
@@ -275,15 +331,24 @@ export class ProfilesService {
       id: view.id,
       displayName: view.displayName,
       photoUrl: view.photoUrl,
+      photos: view.photos,
       bio: view.bio,
-      age: view.age,
+      // Honour "Show age on your profile" for other viewers.
+      age: view.showAge ? view.age : null,
       drinkPreference: view.drinkPreference,
       interests: view.interests,
+      vibe: view.vibe,
       wantsToBeInvitedFor: view.wantsToBeInvitedFor,
       membershipStatus: view.membershipStatus,
       hostedCount: view.hostedCount,
       attendedCount: view.attendedCount,
       padiCount: view.padiCount,
     };
+  }
+
+  // Signed params for a profile gallery upload — unique public_id per upload
+  // (no fixed id) so multiple photos don't overwrite each other.
+  getPhotoUploadSignature(userId: string) {
+    return this.cloudinary.getSignedUploadParams(`${PHOTO_FOLDER}/${userId}`);
   }
 }

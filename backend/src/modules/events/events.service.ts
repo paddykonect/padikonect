@@ -305,6 +305,23 @@ export class EventsService {
       );
     }
 
+    // Hosting under a community requires membership.
+    if (dto.communityId) {
+      const member = await this.prisma.communityMember.findUnique({
+        where: {
+          communityId_userId: { communityId: dto.communityId, userId: hostId },
+        },
+        select: { communityId: true },
+      });
+      if (!member) {
+        throw new AppException(
+          'NOT_A_COMMUNITY_MEMBER',
+          'Join the community before hosting an event for it.',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
     // The first photo is the cover (kept on Event for cards/map/favorites).
     const cover = dto.media?.[0];
     const venue = dto.venueId ? await this.findVenue(dto.venueId) : null;
@@ -326,6 +343,7 @@ export class EventsService {
             ? `${venue.name}, ${venue.addressText}`
             : dto.addressText,
           venueId: venue?.id,
+          communityId: dto.communityId,
           venueApproval: venue ? 'PENDING' : 'NOT_REQUIRED',
           latitude,
           longitude,

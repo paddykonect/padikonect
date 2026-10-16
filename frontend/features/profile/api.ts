@@ -14,6 +14,10 @@ export function getAvatarUploadSignature(accessToken: string) {
   return apiRequest<SignedUploadParams>("/profiles/me/avatar-upload-signature", { method: "GET", accessToken });
 }
 
+export function getPhotoUploadSignature(accessToken: string) {
+  return apiRequest<SignedUploadParams>("/profiles/me/photo-upload-signature", { method: "GET", accessToken });
+}
+
 export function updateAvatar(accessToken: string, photoUrl: string) {
   return apiRequest<OwnProfile>("/profiles/me/avatar", { method: "PATCH", body: { photoUrl }, accessToken });
 }

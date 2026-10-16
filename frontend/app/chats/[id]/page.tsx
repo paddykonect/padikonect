@@ -115,7 +115,12 @@ function ThreadContent() {
   }
 
   const isGroup = chat?.type === "EVENT" || chat?.type === "COMMUNITY";
-  const infoHref = chat?.type === "DIRECT" && chat.otherUserId ? `/padi/${chat.otherUserId}` : null;
+  const infoHref =
+    chat?.type === "DIRECT" && chat.otherUserId
+      ? `/padi/${chat.otherUserId}`
+      : chat?.type === "EVENT" && chat.eventId
+        ? `/hangouts/${chat.eventId}`
+        : null;
 
   return (
     <div className="mx-auto flex h-dvh w-full max-w-[430px] flex-col bg-background">
