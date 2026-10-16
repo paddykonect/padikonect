@@ -100,6 +100,7 @@ export interface EventInput {
   latitude?: number;
   longitude?: number;
   venueId?: string;
+  communityId?: string;
   startAt: string;
   endAt?: string;
   capacity: number;

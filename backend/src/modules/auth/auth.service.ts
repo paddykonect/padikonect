@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { AccountStatus, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
@@ -247,7 +247,29 @@ export class AuthService {
     dto: GoogleSignInDto,
     meta: RequestMeta,
   ): Promise<AuthTokens & { isNewUser: boolean }> {
+    // DEBUG(google-500): remove once the Google sign-in 500 is diagnosed.
+    const log = new Logger('GoogleSignIn');
+    log.log(
+      `start: keepMeLoggedIn=${dto.keepMeLoggedIn} ageConfirmed=${dto.ageConfirmed} termsAccepted=${dto.termsAccepted}`,
+    );
+    try {
+      return await this.googleSignInInner(dto, meta, log);
+    } catch (err) {
+      log.error(
+        `failed: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
+    }
+  }
+
+  private async googleSignInInner(
+    dto: GoogleSignInDto,
+    meta: RequestMeta,
+    log: Logger,
+  ): Promise<AuthTokens & { isNewUser: boolean }> {
     const identity = await this.google.verify(dto.idToken);
+    log.log(`verified: email=${identity.email}`);
 
     const existing = await this.prisma.user.findFirst({
       where: {
@@ -258,6 +280,11 @@ export class AuthService {
       },
     });
 
+    log.log(
+      existing
+        ? `existing user id=${existing.id} status=${existing.status} hasGoogleId=${!!existing.googleId}`
+        : 'no existing user -> signup path',
+    );
     if (existing) {
       if (
         existing.status !== AccountStatus.ACTIVE &&
@@ -301,6 +328,7 @@ export class AuthService {
       );
     }
 
+    log.log('creating user');
     const user = await this.prisma.user.create({
       data: {
         fullName: identity.name ?? identity.email.split('@')[0],

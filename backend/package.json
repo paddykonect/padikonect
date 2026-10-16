@@ -23,7 +23,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed:demo": "ts-node prisma/seed-demo.ts",
-    "prisma:seed:radar": "ts-node prisma/seed-radar.ts"
+    "prisma:seed:radar": "ts-node prisma/seed-radar.ts",
+    "prisma:seed:communities": "ts-node prisma/seed-communities.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

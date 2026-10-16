@@ -16,7 +16,11 @@ function baseProfile(overrides: Partial<Record<string, unknown>> = {}) {
     bio: null,
     drinkPreference: DrinkPreference.BOTH,
     interests: [] as string[],
+    vibe: [] as string[],
+    invitePlans: [] as string[],
     wantsToBeInvitedFor: null,
+    showAge: true,
+    photos: [] as { url: string; publicId: string | null; position: number }[],
     padiPoints: 0,
     user: {
       fullName: 'Ada Obi',

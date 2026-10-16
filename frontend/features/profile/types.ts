@@ -1,14 +1,24 @@
 export type DrinkPreference = "ALCOHOLIC" | "NON_ALCOHOLIC" | "BOTH";
 export type InvitePolicy = "EVERYONE" | "PADIS_ONLY" | "NO_ONE";
 
+export interface ProfilePhoto {
+  url: string;
+  publicId: string | null;
+  position: number;
+}
+
 export interface OwnProfile {
   id: string;
   displayName: string | null;
   photoUrl: string | null;
+  photos: ProfilePhoto[];
   bio: string | null;
   age: number | null;
+  showAge: boolean;
   drinkPreference: DrinkPreference;
   interests: string[];
+  vibe: string[];
+  invitePlans: string[];
   wantsToBeInvitedFor: string | null;
   country: string | null;
   nationality: string | null;
@@ -30,7 +40,7 @@ export interface OwnProfile {
 /** What other padis can see (GET /profiles/:userId). */
 export type PublicProfile = Pick<
   OwnProfile,
-  "id" | "displayName" | "photoUrl" | "bio" | "age" | "drinkPreference" | "interests" | "wantsToBeInvitedFor" | "membershipStatus" | "hostedCount" | "attendedCount" | "padiCount"
+  "id" | "displayName" | "photoUrl" | "photos" | "bio" | "age" | "drinkPreference" | "interests" | "vibe" | "wantsToBeInvitedFor" | "membershipStatus" | "hostedCount" | "attendedCount" | "padiCount"
 >;
 
 export interface UpdateProfileInput {
@@ -38,6 +48,10 @@ export interface UpdateProfileInput {
   bio?: string;
   drinkPreference?: DrinkPreference;
   interests?: string[];
+  vibe?: string[];
+  invitePlans?: string[];
+  photos?: { url: string; publicId?: string }[];
+  showAge?: boolean;
   wantsToBeInvitedFor?: string;
   country?: string;
   nationality?: string;

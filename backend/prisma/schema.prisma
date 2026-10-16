@@ -72,6 +72,7 @@ model User {
   messages                Message[]
   communitiesCreated      Community[]
   communityMemberships    CommunityMember[]
+  communityFavorites      CommunityFavorite[]
   liveLocation            LiveLocation?
   statusViews             StatusView[]
   blocksMade              Block[]                   @relation("Blocker")
@@ -141,9 +142,19 @@ model Profile {
   bio               String?         @db.VarChar(280)
   drinkPreference   DrinkPreference @default(BOTH)
   interests         String[]
+  // "Your vibe" chips on the profile (Easygoing, Coffee person, …) — distinct
+  // from interests; short self-describing tags.
+  vibe              String[]        @default([])
+  // Invitation preferences ("What should we invite you for?"): the selected
+  // plan categories. Empty = "Anything — Surprise me".
+  invitePlans       String[]        @default([])
   // Profile card ("Wants to be invited for") — a short free-text hint shown on
   // your profile about the kinds of hangouts you'd like invites to.
   wantsToBeInvitedFor String?       @db.VarChar(80)
+  // Edit profile > "Show age on your profile".
+  showAge           Boolean         @default(true)
+  // Profile photo gallery ("Profile fotos"); position 0 mirrors photoUrl.
+  photos            ProfilePhoto[]
   // Onboarding location sub-flow (Figma-only, not in the PRD — added at the
   // user's explicit request). country/state use Nigeria's states where
   // applicable; nationality is only set when the user confirms it matches
@@ -164,6 +175,20 @@ model Profile {
   radarDiscoverable Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+// Profile photo gallery ("Profile fotos"). position-0 item is mirrored into
+// Profile.photoUrl for the avatar/cover used across the app.
+model ProfilePhoto {
+  id        String   @id @default(uuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  url       String
+  publicId  String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([profileId])
 }
 
 // Who may send you hangout invites (Settings > Who can invite me). Doesn't
@@ -332,6 +357,10 @@ model Event {
   status             EventStatus                           @default(PUBLISHED)
   venueId            String?
   venue              Venue?                                @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  // A hangout can belong to a community ("Host an event for this community" →
+  // the community's Events tab). Null = a standalone hangout.
+  communityId        String?
+  community          Community?                            @relation(fields: [communityId], references: [id], onDelete: SetNull)
   venueApproval      VenueApproval                         @default(NOT_REQUIRED)
   // Set when the host sends the in-app confirmation request to the venue.
   venueRequestedAt   DateTime?
@@ -353,6 +382,7 @@ model Event {
 
   @@index([hostId])
   @@index([venueId])
+  @@index([communityId])
   @@index([startAt])
   @@index([status, startAt])
   @@index([tags], type: Gin)
@@ -639,11 +669,19 @@ model Community {
   city        String   @db.VarChar(60)
   minAge      Int      @default(18)
   maxAge      Int      @default(99)
+  // Cover photo (Figma community cards + detail header); null = tinted fallback.
+  coverImageUrl      String?
+  coverImagePublicId String?
+  // "VIBE" chips and numbered "RULES" on the community detail Overview tab.
+  vibe        String[] @default([])
+  rules       String[] @default([])
   creatorId   String
   creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 
   members      CommunityMember[]
+  favorites    CommunityFavorite[]
+  events       Event[]
   conversation Conversation?
 
   @@index([city])
@@ -656,6 +694,19 @@ model CommunityMember {
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   role        CommunityRole @default(MEMBER)
   joinedAt    DateTime      @default(now())
+
+  @@id([communityId, userId])
+  @@index([userId])
+}
+
+// The heart on a community card (Figma "Favorites" / Favorite communities page).
+// Mirrors EventFavorite.
+model CommunityFavorite {
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 
   @@id([communityId, userId])
   @@index([userId])

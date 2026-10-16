@@ -71,7 +71,10 @@ function SettingsContent() {
   async function save(input: UpdateProfileInput) {
     if (!accessToken || !profile) return;
     const previous = profile;
-    setProfile({ ...profile, ...input });
+    // `photos` has a different shape on OwnProfile (carries position); the
+    // server response below restores the canonical value, so skip it here.
+    const { photos: _photos, ...optimistic } = input;
+    setProfile({ ...profile, ...optimistic });
     setError(null);
     try {
       setProfile(await profileApi.updateOwnProfile(accessToken, input));

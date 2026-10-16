@@ -271,6 +271,7 @@ function HostHangoutContent() {
   const params = useSearchParams();
   const editId = params.get("edit");
   const presetVenueId = params.get("venueId");
+  const presetCommunityId = params.get("communityId");
   const { accessToken } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -535,7 +536,7 @@ function HostHangoutContent() {
             ...media,
             ...(spot === originalSpot ? {} : location),
           })
-        : await eventsApi.createEvent(accessToken, { ...details, ...media, ...location, privacy });
+        : await eventsApi.createEvent(accessToken, { ...details, ...media, ...location, privacy, ...(presetCommunityId && { communityId: presetCommunityId }) });
       if (invited.length) await eventsApi.invitePadis(accessToken, event.id, invited).catch(() => undefined);
       if (phones.length) await eventsApi.setPhoneInvites(accessToken, event.id, phones).catch(() => undefined);
       router.replace(event.venueApproval === "PENDING" ? `/hangouts/${event.id}/venue` : `/hangouts/${event.id}`);

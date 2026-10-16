@@ -30,6 +30,11 @@ export class ProfilesController {
     return this.profiles.getAvatarUploadSignature(user.id);
   }
 
+  @Get('me/photo-upload-signature')
+  getPhotoUploadSignature(@CurrentUser() user: AuthenticatedUser) {
+    return this.profiles.getPhotoUploadSignature(user.id);
+  }
+
   @Patch('me/avatar')
   updateAvatar(
     @CurrentUser() user: AuthenticatedUser,

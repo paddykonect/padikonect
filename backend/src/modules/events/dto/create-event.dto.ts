@@ -131,6 +131,13 @@ export class CreateEventDto {
   @IsUUID()
   venueId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Host this hangout under a community (its Events tab).',
+  })
+  @IsOptional()
+  @IsUUID()
+  communityId?: string;
+
   @ApiPropertyOptional({ enum: EventPrivacy, default: EventPrivacy.PUBLIC })
   @IsOptional()
   @IsEnum(EventPrivacy)
