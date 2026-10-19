@@ -3,6 +3,7 @@ import { AccountStatus, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import Redis from 'ioredis';
 import { AppException } from '../../common/exceptions/app.exception';
+import { markSessionsRevoked } from '../../common/utils/session-revocation.util';
 import { REDIS_CLIENT } from '../../database/redis.module';
 import { PrismaService } from '../../database/prisma.service';
 import { MailerService } from '../../integrations/mailer/mailer.service';
@@ -259,7 +260,7 @@ export class AccountService {
 
     await this.sessions.revokeAllForUser(userId);
     // Kill already-issued access tokens too (checked by JwtAuthGuard).
-    await this.redis.set(`revoked:${userId}`, '1', 'EX', 15 * 60);
+    await markSessionsRevoked(this.redis, userId);
     await this.redis.del(contactChangeKey(userId));
 
     for (const event of upcomingHosted) {

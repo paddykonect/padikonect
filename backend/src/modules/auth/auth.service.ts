@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { AppException } from '../../common/exceptions/app.exception';
+import { markSessionsRevoked } from '../../common/utils/session-revocation.util';
 import { REDIS_CLIENT } from '../../database/redis.module';
 import { PrismaService } from '../../database/prisma.service';
 import { MailerService } from '../../integrations/mailer/mailer.service';
@@ -390,7 +391,7 @@ export class AuthService {
 
   async logoutAll(userId: string): Promise<void> {
     await this.sessions.revokeAllForUser(userId);
-    await this.markSessionsRevoked(userId);
+    await markSessionsRevoked(this.redis, userId);
   }
 
   async forgotPassword(
@@ -443,13 +444,7 @@ export class AuthService {
     });
 
     await this.sessions.revokeAllForUser(userId);
-    await this.markSessionsRevoked(userId);
-  }
-
-  private async markSessionsRevoked(userId: string): Promise<void> {
-    // Bounds how long an already-issued access token stays valid after a
-    // revocation event — checked by JwtAuthGuard on every request.
-    await this.redis.set(`revoked:${userId}`, '1', 'EX', 15 * 60);
+    await markSessionsRevoked(this.redis, userId);
   }
 
   private async issueTokens(
