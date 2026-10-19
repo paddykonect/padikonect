@@ -8,6 +8,7 @@ export interface AccessTokenPayload {
   sub: string;
   role: 'MEMBER' | 'ADMIN';
   status: string;
+  iat?: number;
 }
 
 @Injectable()
@@ -26,6 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       id: payload.sub,
       role: payload.role,
       status: payload.status,
+      issuedAt: payload.iat,
     };
   }
 }

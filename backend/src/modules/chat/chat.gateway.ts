@@ -7,10 +7,12 @@ import {
 } from '@nestjs/websockets';
 import Redis from 'ioredis';
 import { Server, Socket } from 'socket.io';
+import { isTokenRevoked } from '../../common/utils/session-revocation.util';
 import { REDIS_CLIENT } from '../../database/redis.module';
 
 interface AccessTokenPayload {
   sub: string;
+  iat?: number;
 }
 
 /**
@@ -46,7 +48,7 @@ export class ChatGateway implements OnGatewayConnection {
     try {
       if (typeof token !== 'string') throw new Error('missing token');
       const payload = await this.jwt.verifyAsync<AccessTokenPayload>(token);
-      if (await this.redis.get(`revoked:${payload.sub}`)) {
+      if (await isTokenRevoked(this.redis, payload.sub, payload.iat)) {
         throw new Error('revoked');
       }
       await client.join(`user:${payload.sub}`);

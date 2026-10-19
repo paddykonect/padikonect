@@ -7,6 +7,7 @@ import { REDIS_CLIENT } from '../../database/redis.module';
 import { AppException } from '../exceptions/app.exception';
 import { HttpStatus } from '@nestjs/common';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
+import { isTokenRevoked } from '../utils/session-revocation.util';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -33,8 +34,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Bounds revocation latency to well under the access-token TTL — admin
     // suspend/password-reset take effect immediately instead of waiting out
     // an otherwise-still-valid JWT.
-    const revoked = await this.redis.get(`revoked:${request.user.id}`);
-    if (revoked) {
+    if (
+      await isTokenRevoked(this.redis, request.user.id, request.user.issuedAt)
+    ) {
       throw new AppException(
         'SESSION_REVOKED',
         'Your session has been revoked. Please log in again.',
