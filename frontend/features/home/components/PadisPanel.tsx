@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { distanceMeters } from "@/features/hangouts/places";
+import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 import * as padisApi from "@/features/padis/api";
 import { PadiListItem, PadiUser } from "@/features/padis/types";
 import * as radarApi from "@/features/radar/api";
@@ -229,6 +230,8 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
         longitude: p.longitude,
         emoji: initials(p.user.displayName),
         isText: true,
+        photoUrl: p.user.photoUrl ? cloudinaryDisplayUrl(p.user.photoUrl, { width: 96 }) : null,
+        online: p.user.online,
         label: p.user.displayName,
       })),
     [filtered],

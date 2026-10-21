@@ -132,13 +132,13 @@ function CommunityDetailContent() {
 
   const c = community;
   const reportLink = (
-    <button type="button" onClick={() => setReportOpen(true)} className="self-start py-2 font-body text-[13px] font-medium text-danger">
+    <button type="button" onClick={() => setReportOpen(true)} className="mx-auto py-2 font-body text-[13px] font-medium text-danger">
       Report community
     </button>
   );
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-background pb-10">
+    <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-background pb-10">
       <header className="sticky top-0 z-20 flex items-center justify-between bg-background px-5 py-4">
         <button type="button" onClick={() => router.back()} aria-label="Back" className="flex size-9 items-center justify-center rounded-full bg-card">
           <Image src="/icons/chevron-left.svg" alt="" width={16} height={16} className="dark-invert" />
@@ -148,6 +148,28 @@ function CommunityDetailContent() {
           ⋯
         </button>
       </header>
+
+      {/* "⋯" dropdown (Figma shows a small popup near the icon) */}
+      {menuOpen && (
+        <>
+          <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-30 cursor-default" />
+          <div className="absolute right-5 top-[58px] z-40 w-52 overflow-hidden rounded-2xl bg-card py-1 shadow-[0px_10px_30px_rgba(23,62,50,0.18)]">
+            {!c.isMember && (
+              <button type="button" disabled={busy} onClick={() => void join()} className="flex w-full items-center gap-3 px-4 py-3 text-left font-body text-sm text-heading">
+                <PlusIcon size={16} /> Join community
+              </button>
+            )}
+            {c.isMember && !c.isOwner && (
+              <button type="button" disabled={busy} onClick={() => void leave()} className="flex w-full items-center gap-3 px-4 py-3 text-left font-body text-sm text-heading">
+                <TicketIcon size={16} /> Leave community
+              </button>
+            )}
+            <button type="button" onClick={() => { setMenuOpen(false); setReportOpen(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left font-body text-sm text-danger">
+              Report community
+            </button>
+          </div>
+        </>
+      )}
 
       <main className="flex flex-col gap-4 px-5">
         {/* Cover */}
@@ -225,10 +247,10 @@ function CommunityDetailContent() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex rounded-full bg-toggle-bg p-1">
+        {/* Tabs: active = dark pill, inactive = plain text */}
+        <div className="flex items-center gap-1 border-b border-border pb-1">
           {(["overview", "members", "events"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTab(t)} className={`h-9 flex-1 rounded-full font-body text-[13px] font-bold capitalize ${tab === t ? "bg-ink text-white" : "text-body-text"}`}>
+            <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full px-4 py-2 font-body text-[13px] font-bold capitalize ${tab === t ? "bg-ink text-white" : "text-body-text"}`}>
               {t}
             </button>
           ))}
@@ -313,25 +335,6 @@ function CommunityDetailContent() {
 
         {error && <p className="font-body text-sm text-danger">{error}</p>}
       </main>
-
-      {/* "⋯" menu */}
-      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={c.name}>
-        <div className="flex flex-col">
-          {!c.isMember && (
-            <button type="button" disabled={busy} onClick={() => void join()} className="flex items-center gap-3 py-3 text-left font-body text-sm font-medium text-heading">
-              <PlusIcon size={18} /> Join community
-            </button>
-          )}
-          {c.isMember && !c.isOwner && (
-            <button type="button" disabled={busy} onClick={() => void leave()} className="flex items-center gap-3 py-3 text-left font-body text-sm font-medium text-heading">
-              <TicketIcon size={18} /> Leave community
-            </button>
-          )}
-          <button type="button" onClick={() => { setMenuOpen(false); setReportOpen(true); }} className="flex items-center gap-3 py-3 text-left font-body text-sm font-medium text-danger">
-            Report community
-          </button>
-        </div>
-      </BottomSheet>
 
       {/* Report sheet */}
       <BottomSheet open={reportOpen} onClose={() => setReportOpen(false)} title="Report community" description="Tell us what's wrong. Our team will review it.">

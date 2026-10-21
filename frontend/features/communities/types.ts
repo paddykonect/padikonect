@@ -4,6 +4,11 @@ export interface CommunityAdmin {
   photoUrl: string | null;
 }
 
+export interface CommunityMemberPreview {
+  displayName: string | null;
+  photoUrl: string | null;
+}
+
 export interface Community {
   id: string;
   name: string;
@@ -14,6 +19,7 @@ export interface Community {
   maxAge: number;
   coverImageUrl: string | null;
   memberCount: number;
+  memberAvatars: CommunityMemberPreview[];
   isMember: boolean;
   isOwner: boolean;
   isFavorite: boolean;

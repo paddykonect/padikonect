@@ -13,6 +13,10 @@ export interface MapPin {
   isText?: boolean;
   /** Plain round marker (Figma 304:30666) instead of the teardrop. */
   dot?: boolean;
+  /** Padi photo pin — a round profile picture (falls back to initials). */
+  photoUrl?: string | null;
+  /** Shows a green presence dot on a photo pin. */
+  online?: boolean;
   label: string;
 }
 
@@ -31,6 +35,23 @@ interface GoogleMapProps {
 // coordinate. The emoji/initials sit upright in the middle. `dot` pins are a
 // plain lime circle centred on the point.
 function PinMarker({ pin, selected }: { pin: MapPin; selected: boolean }) {
+  // Padi photo pin: a round profile picture centred on the point, with an
+  // optional green presence dot. Falls back to the teardrop when no photo.
+  if (pin.photoUrl) {
+    const d = selected ? 46 : 38;
+    return (
+      <span className="relative block" style={{ transform: "translateY(50%)" }}>
+        <span
+          className="block overflow-hidden rounded-full border-[3px] border-white bg-[#eef3e9] shadow-[0_2px_5px_rgba(0,0,0,.35)]"
+          style={{ width: d, height: d, outline: selected ? "2px solid #c6f135" : undefined, outlineOffset: 1 }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={pin.photoUrl} alt={pin.label} className="size-full object-cover" referrerPolicy="no-referrer" />
+        </span>
+        {pin.online && <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-white bg-live" />}
+      </span>
+    );
+  }
   if (pin.dot) {
     return (
       <span
