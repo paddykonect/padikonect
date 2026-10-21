@@ -15,6 +15,10 @@ const row = {
   rules: ['Be kind', 'RSVP if you can show up'],
   _count: { members: 3 },
   conversation: { id: 'conv1' },
+  members: [
+    { user: { fullName: 'Ada Obi', profile: { displayName: 'Ada', photoUrl: null } } },
+    { user: { fullName: 'Tunde B', profile: { displayName: 'Tunde', photoUrl: null } } },
+  ],
   creator: {
     id: 'owner-1',
     fullName: 'Chidi Admin',

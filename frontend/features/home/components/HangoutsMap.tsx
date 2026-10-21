@@ -5,7 +5,10 @@ import Image from "next/image";
 import { ReactNode, useMemo, useState } from "react";
 import { Place } from "@/features/hangouts/places";
 import { VENUE_CATEGORY_EMOJI } from "@/features/venues/types";
+import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 import type { MapPin } from "./GoogleMap";
+
+const pinPhoto = (url: string | null) => (url ? cloudinaryDisplayUrl(url, { width: 96 }) : null);
 
 // Leaflet touches `window`, so it can only load in the browser.
 const MapView = dynamic(() => import("./GoogleMap"), {
@@ -43,8 +46,8 @@ export function HangoutsMap({ center, isUserLocation, places, selectedKey, onSel
     () =>
       places.map((p) =>
         p.kind === "event"
-          ? { id: p.key, latitude: p.event.latitude, longitude: p.event.longitude, emoji: "🎉", label: p.event.title }
-          : { id: p.key, latitude: p.venue.latitude, longitude: p.venue.longitude, emoji: VENUE_CATEGORY_EMOJI[p.venue.category], label: p.venue.name },
+          ? { id: p.key, latitude: p.event.latitude, longitude: p.event.longitude, emoji: "🎉", photoUrl: pinPhoto(p.event.coverImageUrl), label: p.event.title }
+          : { id: p.key, latitude: p.venue.latitude, longitude: p.venue.longitude, emoji: VENUE_CATEGORY_EMOJI[p.venue.category], photoUrl: pinPhoto(p.venue.coverImageUrl), label: p.venue.name },
       ),
     [places],
   );

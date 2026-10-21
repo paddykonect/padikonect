@@ -68,12 +68,23 @@ export function CommunityCard({ community: c, busy, onJoin, onToggleFavorite }: 
           {c.name}
           {c.emoji && c.coverImageUrl ? <span className="ml-1">{c.emoji}</span> : null}
         </h3>
-        <div className="flex items-center justify-between">
-          <span className="font-body text-xs text-body-text">
-            {c.memberCount} member{c.memberCount === 1 ? "" : "s"}
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-2">
+            {c.memberAvatars.length > 0 && (
+              <span className="flex shrink-0 -space-x-2">
+                {c.memberAvatars.slice(0, 4).map((m, i) => (
+                  <span key={i} className="rounded-full ring-2 ring-card">
+                    <Avatar name={m.displayName ?? "Member"} photoUrl={m.photoUrl} size={22} />
+                  </span>
+                ))}
+              </span>
+            )}
+            <span className="truncate font-body text-xs text-body-text">
+              {c.memberCount} member{c.memberCount === 1 ? "" : "s"}
+            </span>
           </span>
           {c.admin && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex shrink-0 items-center gap-1.5">
               <Avatar name={c.admin.displayName ?? "Admin"} photoUrl={c.admin.photoUrl} size={22} />
               <span className="font-body text-xs text-body-text">{c.admin.displayName} Admin</span>
             </span>

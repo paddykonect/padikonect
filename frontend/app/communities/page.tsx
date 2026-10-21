@@ -14,7 +14,6 @@ import { Community } from "@/features/communities/types";
 import { BookmarkIcon, SearchIcon } from "@/features/hangouts/components/icons";
 import { RequireCountry } from "@/features/profile/require-country";
 import { profileName, useOwnProfile } from "@/features/profile/use-own-profile";
-import { NightModeButton } from "@/features/theme/NightModeButton";
 import { ApiError } from "@/lib/api/client";
 
 // Figma "COMMUNITIES" board: banner, Favorites (+ View All), a create card,
@@ -81,7 +80,6 @@ function CommunitiesContent() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold text-heading">Communities</h1>
         <div className="flex items-center gap-2">
-          <NightModeButton />
           <button type="button" onClick={() => setSearching((v) => !v)} aria-label="Search communities" className="flex size-9 items-center justify-center rounded-full bg-card">
             <SearchIcon size={17} className="text-heading" />
           </button>
@@ -98,13 +96,13 @@ function CommunitiesContent() {
         </label>
       )}
 
-      <div className="flex items-center gap-3.5 rounded-2xl bg-ink p-[18px]">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent/25">
-          <Image src="/icons/community/crew.svg" alt="" width={22} height={22} />
+      <div className="flex items-center gap-3.5 rounded-2xl bg-accent/20 p-4">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white">
+          <Image src="/icons/community/crew.svg" alt="" width={24} height={24} />
         </span>
         <div className="flex flex-col gap-0.5">
-          <p className="font-body text-[14.5px] font-bold text-white">Find your padi crew</p>
-          <p className="font-body text-xs text-[#c7d0ca]">Join a community that shares your vibe.</p>
+          <p className="font-body text-[14.5px] font-bold text-heading">Find your padi crew</p>
+          <p className="font-body text-xs text-body-text">Join a community that shares your vibe.</p>
         </div>
       </div>
 
@@ -129,7 +127,7 @@ function CommunitiesContent() {
             <h2 className="font-body text-xs font-bold uppercase tracking-[0.48px] text-body-text">Favorites</h2>
             {favorites.length > 0 && (
               <Link href="/communities/favorites" className="font-body text-[13px] font-medium text-heading">
-                View all
+                View All
               </Link>
             )}
           </div>
@@ -145,16 +143,21 @@ function CommunitiesContent() {
       )}
 
       {communities !== null && all.length > 0 && !q && (
-        <button type="button" onClick={() => setCreating(true)} className="flex items-center gap-3.5 rounded-2xl bg-card p-[18px] text-left">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent/25">
-            <Image src="/icons/community/crew.svg" alt="" width={22} height={22} />
-          </span>
-          <span className="flex flex-col gap-0.5">
-            <span className="font-body text-sm font-bold text-heading">Create your first community</span>
-            <span className="font-body text-xs text-body-text">Start a crew and invite your padis.</span>
-          </span>
-          <span className="ml-auto rounded-full bg-accent px-4 py-2 font-body text-[13px] font-bold text-[#1b3b2b]">Start</span>
-        </button>
+        <div className="flex flex-col gap-3 rounded-2xl bg-card p-4">
+          <div className="flex items-center gap-3.5">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent/25">
+              <Image src="/icons/community/crew.svg" alt="" width={24} height={24} />
+            </span>
+            <span className="flex flex-col gap-0.5">
+              <span className="font-heading text-base font-bold text-heading">Communities</span>
+              <span className="font-body text-xs text-body-text">Create your first community</span>
+            </span>
+          </div>
+          <button type="button" onClick={() => setCreating(true)} className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent font-body text-sm font-bold text-[#1b3b2b]">
+            <Image src="/icons/community/plus.svg" alt="" width={16} height={16} />
+            Start a community
+          </button>
+        </div>
       )}
 
       {communities !== null && all.length > 0 && (

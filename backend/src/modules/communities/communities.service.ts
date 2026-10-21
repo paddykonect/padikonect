@@ -10,6 +10,11 @@ export interface CommunityAdmin {
   photoUrl: string | null;
 }
 
+export interface CommunityMemberPreview {
+  displayName: string | null;
+  photoUrl: string | null;
+}
+
 export interface CommunityView {
   id: string;
   name: string;
@@ -20,6 +25,8 @@ export interface CommunityView {
   maxAge: number;
   coverImageUrl: string | null;
   memberCount: number;
+  // A handful of member avatars for the card's stacked preview row.
+  memberAvatars: CommunityMemberPreview[];
   isMember: boolean;
   isOwner: boolean;
   isFavorite: boolean;
@@ -62,6 +69,19 @@ export interface CommunityEventView {
 const include = {
   _count: { select: { members: true } },
   conversation: { select: { id: true } },
+  // A few members for the card's stacked avatar preview.
+  members: {
+    take: 6,
+    orderBy: { joinedAt: 'asc' },
+    select: {
+      user: {
+        select: {
+          fullName: true,
+          profile: { select: { displayName: true, photoUrl: true } },
+        },
+      },
+    },
+  },
   creator: {
     select: {
       id: true,
@@ -111,6 +131,10 @@ export class CommunitiesService {
       maxAge: c.maxAge,
       coverImageUrl: c.coverImageUrl,
       memberCount: c._count.members,
+      memberAvatars: c.members.map((m) => ({
+        displayName: m.user.profile?.displayName ?? m.user.fullName,
+        photoUrl: m.user.profile?.photoUrl ?? null,
+      })),
       isMember: !!role,
       isOwner: role === 'OWNER',
       isFavorite,

@@ -9,8 +9,12 @@ const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
   images: {
-    // Country flags for the onboarding country picker.
-    remotePatterns: [{ protocol: "https", hostname: "flagcdn.com" }],
+    remotePatterns: [
+      // Country flags for the onboarding country picker.
+      { protocol: "https", hostname: "flagcdn.com" },
+      // Demo avatar photos (seed data).
+      { protocol: "https", hostname: "i.pravatar.cc" },
+    ],
   },
   async rewrites() {
     return [

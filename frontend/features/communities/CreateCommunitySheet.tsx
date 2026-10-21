@@ -95,41 +95,65 @@ export function CreateCommunitySheet({ open, accessToken, onClose, onCreated }: 
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Start a community" description="Bring together padis who share your vibe.">
-      <button type="button" onClick={() => fileRef.current?.click()} className="relative h-[120px] w-full overflow-hidden rounded-2xl border border-dashed border-body-text bg-[#eef3e9]">
-        {coverUrl ? (
-          <Image src={cloudinaryDisplayUrl(coverUrl, { width: 600 })} alt="Cover" fill sizes="430px" className="object-cover" unoptimized />
-        ) : (
-          <span className="flex size-full flex-col items-center justify-center gap-1 text-body-text">
-            <CameraIcon size={22} />
-            <span className="font-body text-[13px]">{uploading ? "Uploading…" : "Add a cover photo"}</span>
+      {/* Cover board with a camera badge and the chosen icon overlapping it */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className={`relative flex h-[140px] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#eef3e9] ${coverUrl ? "" : "border border-dashed border-body-text"}`}
+        >
+          {coverUrl ? (
+            <Image src={cloudinaryDisplayUrl(coverUrl, { width: 600 })} alt="Cover" fill sizes="430px" className="object-cover" unoptimized />
+          ) : (
+            <span className="flex flex-col items-center justify-center gap-1 text-body-text">
+              <CameraIcon size={22} />
+              <span className="font-body text-[13px]">{uploading ? "Uploading…" : "Add a cover photo"}</span>
+            </span>
+          )}
+          <span className="absolute right-2.5 top-2.5 flex size-8 items-center justify-center rounded-full bg-ink/70 text-white">
+            <CameraIcon size={15} />
           </span>
-        )}
-      </button>
+        </button>
+        <span className="absolute -bottom-5 left-4 flex size-[52px] items-center justify-center rounded-2xl border-4 border-background bg-accent/35 text-2xl shadow-sm">
+          {emoji}
+        </span>
+      </div>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadCover(f); e.target.value = ""; }} />
 
-      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Community emoji">
-        {EMOJIS.map((e) => (
-          <button
-            key={e}
-            type="button"
-            role="radio"
-            aria-checked={emoji === e}
-            onClick={() => setEmoji(e)}
-            className={`flex size-10 items-center justify-center rounded-xl text-xl ${emoji === e ? "border-2 border-heading bg-accent/35" : "border border-border bg-card"}`}
-          >
-            {e}
-          </button>
-        ))}
+      {/* Icon picker */}
+      <div className="flex flex-col gap-2 pt-6">
+        <span className="font-body text-sm font-medium text-heading">Choose an icon</span>
+        <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Community icon">
+          {EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              role="radio"
+              aria-checked={emoji === e}
+              onClick={() => setEmoji(e)}
+              className={`flex aspect-square items-center justify-center rounded-xl text-xl transition-colors ${emoji === e ? "border-2 border-heading bg-accent/35" : "border border-border bg-card"}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
       </div>
-      <TextField placeholder="Community name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        maxLength={280}
-        rows={3}
-        placeholder="What's it about? (at least 10 characters)"
-        className="w-full resize-none rounded-field border border-border bg-card px-4 py-3 font-body text-[15px] text-input-text outline-none placeholder:text-body-text focus:border-border-focus"
-      />
+
+      <label className="flex flex-col gap-1.5">
+        <span className="font-body text-sm font-medium text-heading">Community name</span>
+        <TextField placeholder="e.g. Coffee & Culture Explore" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="font-body text-sm font-medium text-heading">About</span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={280}
+          rows={3}
+          placeholder="What's it about? (at least 10 characters)"
+          className="w-full resize-none rounded-field border border-border bg-card px-4 py-3 font-body text-[15px] text-input-text outline-none placeholder:text-body-text focus:border-border-focus"
+        />
+      </label>
 
       <div className="flex flex-col gap-2">
         <span className="font-body text-sm font-medium text-heading">Vibe (optional)</span>
