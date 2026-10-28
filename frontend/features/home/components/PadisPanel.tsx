@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { distanceMeters } from "@/features/hangouts/places";
 import { cloudinaryDisplayUrl } from "@/lib/media/cloudinary";
 import * as padisApi from "@/features/padis/api";
+import * as profileApi from "@/features/profile/api";
 import { PadiListItem, PadiUser } from "@/features/padis/types";
 import * as radarApi from "@/features/radar/api";
 import { RadarPadi } from "@/features/radar/api";
@@ -142,12 +143,17 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
     try {
       if (sharing) {
         await radarApi.stopSharing(accessToken);
+        // Also drop off the "people near you" radar when you stop sharing.
+        await profileApi.updateOwnProfile(accessToken, { radarDiscoverable: false }).catch(() => undefined);
         setSharing(false);
       } else {
         const p = await currentPosition().catch(() => {
           throw new Error("Allow location access to share where you are.");
         });
         await radarApi.shareLocation(accessToken, p.coords.latitude, p.coords.longitude);
+        // Sharing location also makes you findable by nearby padis-to-be
+        // ("People near you") — that's the point of the radar.
+        await profileApi.updateOwnProfile(accessToken, { radarDiscoverable: true }).catch(() => undefined);
         setSharing(true);
       }
     } catch (err) {
@@ -337,8 +343,8 @@ export function PadisPanel({ accessToken, center, position, nav }: PadisPanelPro
       {!listMode && (
         <div className="flex items-center gap-3 rounded-2xl bg-card p-3.5">
           <div className="min-w-0 flex-1">
-            <p className="font-body text-sm font-bold text-heading">Share my location with padis</p>
-            <p className="font-body text-xs text-body-text">Only people you&apos;ve added can see you, roughly (~100m). Off by default.</p>
+            <p className="font-body text-sm font-bold text-heading">Share my location</p>
+            <p className="font-body text-xs text-body-text">Your padis and nearby people can find you, roughly (~100m). Off by default.</p>
           </div>
           <button
             type="button"

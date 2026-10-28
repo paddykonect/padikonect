@@ -115,9 +115,15 @@ export default function GoogleMap({ center, pins, selectedId, onSelect, resizeKe
             position={{ lat: pin.latitude, lng: pin.longitude }}
             title={pin.label}
             zIndex={pin.id === selectedId ? 1000 : undefined}
-            onClick={interactive ? () => onSelect(pin.id) : undefined}
           >
-            <PinMarker pin={pin} selected={pin.id === selectedId} />
+            {/* Handle the tap on the pin's own DOM and stop it bubbling to the
+                map, whose click would otherwise immediately clear the selection. */}
+            <div
+              style={{ cursor: interactive ? "pointer" : "default" }}
+              onClick={interactive ? (e) => { e.stopPropagation(); onSelect(pin.id); } : undefined}
+            >
+              <PinMarker pin={pin} selected={pin.id === selectedId} />
+            </div>
           </AdvancedMarker>
         ))}
       </GMap>
