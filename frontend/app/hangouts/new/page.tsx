@@ -1030,10 +1030,10 @@ function HostHangoutContent() {
       <BottomSheet open={justChecking} onClose={() => setJustChecking(false)} title="Just checking..">
         <div className="flex flex-col gap-3">
           <p className="-mt-2 font-body text-sm text-body-text">You told us this</p>
-          <ul className="flex flex-col gap-2 rounded-2xl bg-[#f6f7d9] p-4">
+          <ul className="flex flex-col gap-2 rounded-2xl bg-toggle-bg p-4">
             {[`Starting group of ${startingGroupSize}`, `Minimum ${minJoiners} joiners to lock it in`, `Max ${capacity} amigos`, ...(membershipOn && minPadiPoints ? [`Members only · ${minPadiPoints}+ padi points`] : [])].map((line) => (
               <li key={line} className="flex items-center gap-2 font-body text-sm text-heading">
-                <CheckIcon size={16} className="shrink-0 text-ink" />
+                <CheckIcon size={16} className="shrink-0 text-primary" />
                 {line}
               </li>
             ))}

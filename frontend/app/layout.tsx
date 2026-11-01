@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Baloo_2, Work_Sans } from "next/font/google";
 import { AuthProvider } from "@/features/auth/auth-context";
+import { NotificationBanner } from "@/features/notifications/NotificationBanner";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/features/theme/theme";
 import "./globals.css";
 
@@ -28,8 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <NotificationBanner />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
 }
+

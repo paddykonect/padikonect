@@ -40,7 +40,14 @@ function RequestsContent() {
     setError(null);
     try {
       await eventsApi.decideJoinRequest(accessToken, id, userId, decision);
-      setRequests((list) => list?.filter((r) => r.user.id !== userId) ?? null);
+      setRequests((prev) => {
+        const updated = prev?.filter((r) => r.user.id !== userId) ?? null;
+        // When all requests have been handled, go back to the hangout detail.
+        if (updated !== null && updated.length === 0) {
+          router.push(`/hangouts/${id}`);
+        }
+        return updated;
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
